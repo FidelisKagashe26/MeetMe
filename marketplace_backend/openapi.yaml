@@ -2,46 +2,195 @@ openapi: 3.0.3
 info:
   title: Marketplace API
   version: 1.0.0
-  description: API ya mfano kwa DRF
+  description: Location-based marketplace backend
 paths:
+  /api/auth/jwt/create/:
+    post:
+      operationId: auth_jwt_create_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/auth/jwt/refresh/:
+    post:
+      operationId: auth_jwt_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/auth/jwt/verify/:
+    post:
+      operationId: auth_jwt_verify_create
+      description: |-
+        Takes a token and indicates if it is valid.  This view provides no
+        information about a token's fitness for a particular use.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/auth/login/:
     post:
       operationId: auth_login_create
-      description: Login user and return token
+      description: |-
+        Login user and return JWT access & refresh tokens.
+
+        NOTE: The request uses `username` field, but frontend may send either:
+          - username
+          - or email (we try both)
+      summary: Login user and return JWT tokens
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWTToken'
+          description: ''
+        '400':
+          description: Missing credentials
+        '401':
+          description: Invalid credentials
   /api/auth/logout/:
     post:
       operationId: auth_logout_create
-      description: Logout user by deleting token
+      description: |-
+        Logout user by blacklisting refresh token.
+        Client should also delete tokens locally.
+      summary: Logout user by blacklisting refresh token
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          description: Error while logging out
   /api/auth/register/:
     post:
       operationId: auth_register_create
-      description: Register a new user
+      description: Register a new user and return JWT tokens
+      summary: Register a new user
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+        required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
-        '200':
-          description: No response body
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWTToken'
+          description: ''
+        '400':
+          description: Validation error
   /api/categories/:
     get:
       operationId: categories_list
@@ -62,8 +211,8 @@ paths:
       tags:
       - categories
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -81,17 +230,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '201':
           content:
@@ -113,8 +262,8 @@ paths:
       tags:
       - categories
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -139,17 +288,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Category'
+              $ref: '#/components/schemas/CategoryRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -173,16 +322,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedCategory'
+              $ref: '#/components/schemas/PatchedCategoryRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedCategory'
+              $ref: '#/components/schemas/PatchedCategoryRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedCategory'
+              $ref: '#/components/schemas/PatchedCategoryRequest'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -203,8 +352,8 @@ paths:
       tags:
       - categories
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '204':
           description: No response body
@@ -234,8 +383,8 @@ paths:
       tags:
       - favorites
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -248,20 +397,9 @@ paths:
       description: ViewSet for user favorites
       tags:
       - favorites
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Favorite'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Favorite'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Favorite'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '201':
           content:
@@ -283,8 +421,8 @@ paths:
       tags:
       - favorites
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -304,20 +442,9 @@ paths:
         required: true
       tags:
       - favorites
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Favorite'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Favorite'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Favorite'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -337,20 +464,9 @@ paths:
         required: true
       tags:
       - favorites
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedFavorite'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedFavorite'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedFavorite'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -371,8 +487,8 @@ paths:
       tags:
       - favorites
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '204':
           description: No response body
@@ -382,20 +498,9 @@ paths:
       description: Toggle favorite status for a seller
       tags:
       - favorites
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Favorite'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Favorite'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Favorite'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -403,49 +508,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Favorite'
           description: ''
-  /api/mapbox/distance/:
+  /api/location/distance/:
     post:
-      operationId: mapbox_distance_create
-      description: Calculate distance between two points
+      operationId: location_distance_create
+      description: Calculate distance between two points (km + miles) using Haversine
+        formula
+      summary: Calculate distance between two points using Haversine
       tags:
-      - mapbox
+      - location
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DistanceRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DistanceRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DistanceRequestRequest'
+        required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
-          description: No response body
-  /api/mapbox/geocode/:
-    post:
-      operationId: mapbox_geocode_create
-      description: Geocode an address to coordinates using Mapbox
-      tags:
-      - mapbox
-      security:
-      - tokenAuth: []
-      - cookieAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
-  /api/mapbox/reverse-geocode/:
-    post:
-      operationId: mapbox_reverse_geocode_create
-      description: Reverse geocode coordinates to address using Mapbox
-      tags:
-      - mapbox
-      security:
-      - tokenAuth: []
-      - cookieAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistanceResponse'
+          description: ''
+        '400':
+          description: Bad request or invalid coordinates
   /api/product-images/:
     get:
       operationId: product_images_list
-      description: ViewSet for product images
+      description: ViewSet for product images (gallery uploads)
       parameters:
       - name: ordering
         required: false
@@ -468,8 +567,9 @@ paths:
       tags:
       - product-images
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -479,24 +579,24 @@ paths:
           description: ''
     post:
       operationId: product_images_create
-      description: ViewSet for product images
+      description: ViewSet for product images (gallery uploads)
       tags:
       - product-images
       requestBody:
         content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductImage'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductImage'
+              $ref: '#/components/schemas/ProductImageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductImageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductImageRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '201':
           content:
@@ -507,7 +607,7 @@ paths:
   /api/product-images/{id}/:
     get:
       operationId: product_images_retrieve
-      description: ViewSet for product images
+      description: ViewSet for product images (gallery uploads)
       parameters:
       - in: path
         name: id
@@ -518,8 +618,9 @@ paths:
       tags:
       - product-images
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -529,7 +630,7 @@ paths:
           description: ''
     put:
       operationId: product_images_update
-      description: ViewSet for product images
+      description: ViewSet for product images (gallery uploads)
       parameters:
       - in: path
         name: id
@@ -541,19 +642,19 @@ paths:
       - product-images
       requestBody:
         content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductImage'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductImage'
+              $ref: '#/components/schemas/ProductImageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductImageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductImageRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -563,7 +664,7 @@ paths:
           description: ''
     patch:
       operationId: product_images_partial_update
-      description: ViewSet for product images
+      description: ViewSet for product images (gallery uploads)
       parameters:
       - in: path
         name: id
@@ -575,18 +676,18 @@ paths:
       - product-images
       requestBody:
         content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedProductImage'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedProductImage'
+              $ref: '#/components/schemas/PatchedProductImageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductImageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductImageRequest'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -596,7 +697,7 @@ paths:
           description: ''
     delete:
       operationId: product_images_destroy
-      description: ViewSet for product images
+      description: ViewSet for product images (gallery uploads)
       parameters:
       - in: path
         name: id
@@ -607,8 +708,8 @@ paths:
       tags:
       - product-images
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '204':
           description: No response body
@@ -638,8 +739,8 @@ paths:
       tags:
       - products
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -657,17 +758,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProductCreate'
+              $ref: '#/components/schemas/ProductCreateRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ProductCreate'
+              $ref: '#/components/schemas/ProductCreateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductCreate'
+              $ref: '#/components/schemas/ProductCreateRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '201':
           content:
@@ -689,8 +790,8 @@ paths:
       tags:
       - products
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -715,17 +816,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Product'
+              $ref: '#/components/schemas/ProductRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Product'
+              $ref: '#/components/schemas/ProductRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Product'
+              $ref: '#/components/schemas/ProductRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -749,16 +850,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedProduct'
+              $ref: '#/components/schemas/PatchedProductRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedProduct'
+              $ref: '#/components/schemas/PatchedProductRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedProduct'
+              $ref: '#/components/schemas/PatchedProductRequest'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -779,32 +880,55 @@ paths:
       tags:
       - products
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '204':
           description: No response body
+  /api/products/nearby/:
+    get:
+      operationId: products_nearby_retrieve
+      description: |-
+        GET /api/products/nearby/?lat=...&lng=...&radius=10&search=...&location=...
+
+        Used by the main marketplace search page:
+        - reads HTML5 geolocation coordinates
+        - applies search + location filters
+        - returns products sorted by distance
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
   /api/products/search_nearby/:
     post:
       operationId: products_search_nearby_create
-      description: Search for products nearby with filters
+      description: Advanced nearby search via POST body (still available if needed)
       tags:
       - products
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Product'
+              $ref: '#/components/schemas/ProductRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Product'
+              $ref: '#/components/schemas/ProductRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Product'
+              $ref: '#/components/schemas/ProductRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -833,8 +957,8 @@ paths:
       tags:
       - reviews
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -852,17 +976,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Review'
+              $ref: '#/components/schemas/ReviewRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Review'
+              $ref: '#/components/schemas/ReviewRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Review'
+              $ref: '#/components/schemas/ReviewRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '201':
           content:
@@ -884,8 +1008,8 @@ paths:
       tags:
       - reviews
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -910,17 +1034,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Review'
+              $ref: '#/components/schemas/ReviewRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Review'
+              $ref: '#/components/schemas/ReviewRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Review'
+              $ref: '#/components/schemas/ReviewRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -944,16 +1068,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedReview'
+              $ref: '#/components/schemas/PatchedReviewRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedReview'
+              $ref: '#/components/schemas/PatchedReviewRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedReview'
+              $ref: '#/components/schemas/PatchedReviewRequest'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -974,8 +1098,8 @@ paths:
       tags:
       - reviews
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '204':
           description: No response body
@@ -1005,8 +1129,8 @@ paths:
       tags:
       - sellers
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -1024,17 +1148,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SellerProfileCreate'
+              $ref: '#/components/schemas/SellerProfileCreateRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SellerProfileCreate'
+              $ref: '#/components/schemas/SellerProfileCreateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SellerProfileCreate'
+              $ref: '#/components/schemas/SellerProfileCreateRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '201':
           content:
@@ -1056,8 +1180,8 @@ paths:
       tags:
       - sellers
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -1082,17 +1206,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SellerProfile'
+              $ref: '#/components/schemas/SellerProfileRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SellerProfile'
+              $ref: '#/components/schemas/SellerProfileRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SellerProfile'
+              $ref: '#/components/schemas/SellerProfileRequest'
         required: true
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -1116,16 +1240,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedSellerProfile'
+              $ref: '#/components/schemas/PatchedSellerProfileRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedSellerProfile'
+              $ref: '#/components/schemas/PatchedSellerProfileRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedSellerProfile'
+              $ref: '#/components/schemas/PatchedSellerProfileRequest'
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '200':
           content:
@@ -1146,8 +1270,8 @@ paths:
       tags:
       - sellers
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       responses:
         '204':
           description: No response body
@@ -1165,8 +1289,8 @@ paths:
       tags:
       - sellers
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -1189,8 +1313,8 @@ paths:
       tags:
       - sellers
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -1202,12 +1326,13 @@ paths:
   /api/sellers/nearby/:
     get:
       operationId: sellers_nearby_retrieve
-      description: Get nearby sellers based on user's location
+      description: Get nearby sellers based on user's location (Haversine, no external
+        API)
       tags:
       - sellers
       security:
-      - tokenAuth: []
-      - cookieAuth: []
+      - jwtAuth: []
+      - BearerAuth: []
       - {}
       responses:
         '200':
@@ -1245,6 +1370,59 @@ components:
       - id
       - name
       - product_count
+    CategoryRequest:
+      type: object
+      description: Serializer for Category model
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+        icon:
+          type: string
+          maxLength: 50
+      required:
+      - name
+    DistanceRequestRequest:
+      type: object
+      description: Request body for distance calculation (Haversine)
+      properties:
+        latitude1:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,8})?$
+        longitude1:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,8})?$
+        latitude2:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,8})?$
+        longitude2:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,8})?$
+      required:
+      - latitude1
+      - latitude2
+      - longitude1
+      - longitude2
+    DistanceResponse:
+      type: object
+      description: Response body for distance calculation
+      properties:
+        distance_km:
+          type: number
+          format: double
+        distance_miles:
+          type: number
+          format: double
+      required:
+      - distance_km
+      - distance_miles
     Favorite:
       type: object
       description: Serializer for Favorite model
@@ -1264,6 +1442,20 @@ components:
       - created_at
       - id
       - seller
+    JWTToken:
+      type: object
+      description: Response body for auth endpoints (register/login) with JWT
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - access
+      - refresh
+      - user
     Location:
       type: object
       description: Serializer for Location model
@@ -1314,6 +1506,75 @@ components:
       - id
       - latitude
       - longitude
+    LocationRequest:
+      type: object
+      description: Serializer for Location model
+      properties:
+        address:
+          type: string
+          minLength: 1
+        city:
+          type: string
+          minLength: 1
+          maxLength: 100
+        state:
+          type: string
+          maxLength: 100
+        country:
+          type: string
+          minLength: 1
+          maxLength: 100
+        postal_code:
+          type: string
+          maxLength: 20
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,8})?$
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,8})?$
+        mapbox_place_id:
+          type: string
+          maxLength: 255
+      required:
+      - address
+      - city
+      - country
+      - latitude
+      - longitude
+    LoginRequest:
+      type: object
+      description: Request body for login endpoint
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    LogoutRequest:
+      type: object
+      description: Request body for logout endpoint (JWT blacklist)
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    Message:
+      type: object
+      description: Simple message response (e.g. logout)
+      properties:
+        message:
+          type: string
+      required:
+      - message
     PaginatedCategoryList:
       type: object
       required:
@@ -1452,162 +1713,91 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SellerProfile'
-    PatchedCategory:
+    PatchedCategoryRequest:
       type: object
       description: Serializer for Category model
       properties:
-        id:
-          type: integer
-          readOnly: true
         name:
           type: string
+          minLength: 1
           maxLength: 100
         description:
           type: string
         icon:
           type: string
           maxLength: 50
-        product_count:
-          type: integer
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-    PatchedFavorite:
+    PatchedProductImageRequest:
       type: object
-      description: Serializer for Favorite model
+      description: |-
+        Serializer for ProductImage model
+
+        - Accepts uploaded file via `image`.
+        - Exposes `image_url` as absolute URL for frontend.
       properties:
-        id:
-          type: integer
-          readOnly: true
-        seller:
-          allOf:
-          - $ref: '#/components/schemas/SellerProfile'
-          readOnly: true
-        created_at:
+        image:
           type: string
-          format: date-time
-          readOnly: true
-    PatchedProduct:
-      type: object
-      description: Serializer for Product model
-      properties:
-        id:
+          format: binary
+        is_primary:
+          type: boolean
+        order:
           type: integer
-          readOnly: true
-        seller:
-          allOf:
-          - $ref: '#/components/schemas/SellerProfile'
-          readOnly: true
-        category:
-          allOf:
-          - $ref: '#/components/schemas/Category'
-          readOnly: true
+    PatchedProductRequest:
+      type: object
+      description: |-
+        Serializer for Product model
+
+        API is shaped to match the marketplace UI:
+
+        - `image` is the uploaded file (write-only or optional).
+        - `image_url` is an absolute URL for the cover image.
+        - Flattens seller shop_name, city, coordinates.
+        - Exposes `is_available` as alias of `in_stock`.
+        - Exposes `distance_km` if nearby search was applied.
+      properties:
         name:
           type: string
+          minLength: 1
           maxLength: 255
         description:
           type: string
+          minLength: 1
         price:
           type: string
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         currency:
           type: string
+          minLength: 1
           maxLength: 3
         stock_quantity:
           type: integer
           minimum: 0
         is_active:
           type: boolean
-        image_url:
+        image:
           type: string
-          format: uri
-          maxLength: 200
-        images:
-          type: array
-          items:
-            $ref: '#/components/schemas/ProductImage'
-          readOnly: true
-        in_stock:
-          type: boolean
-          readOnly: true
-        distance:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-    PatchedProductImage:
-      type: object
-      description: Serializer for ProductImage model
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        image_url:
-          type: string
-          format: uri
-          maxLength: 200
-        is_primary:
-          type: boolean
-        order:
-          type: integer
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-    PatchedReview:
+          format: binary
+          writeOnly: true
+          nullable: true
+    PatchedReviewRequest:
       type: object
       description: Serializer for Review model
       properties:
-        id:
-          type: integer
-          readOnly: true
         seller:
           type: integer
-        seller_name:
-          type: string
-          readOnly: true
-        user:
-          allOf:
-          - $ref: '#/components/schemas/User'
-          readOnly: true
         rating:
           type: integer
           maximum: 5
           minimum: 1
         comment:
           type: string
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-    PatchedSellerProfile:
+    PatchedSellerProfileRequest:
       type: object
       description: Serializer for SellerProfile model
       properties:
-        id:
-          type: integer
-          readOnly: true
-        user:
-          allOf:
-          - $ref: '#/components/schemas/User'
-          readOnly: true
         business_name:
           type: string
+          minLength: 1
           maxLength: 255
         description:
           type: string
@@ -1616,34 +1806,18 @@ components:
           maxLength: 20
         is_verified:
           type: boolean
-        rating:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
-          readOnly: true
-        total_sales:
-          type: integer
-          readOnly: true
-        location:
-          allOf:
-          - $ref: '#/components/schemas/Location'
-          readOnly: true
-        distance:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
     Product:
       type: object
-      description: Serializer for Product model
+      description: |-
+        Serializer for Product model
+
+        API is shaped to match the marketplace UI:
+
+        - `image` is the uploaded file (write-only or optional).
+        - `image_url` is an absolute URL for the cover image.
+        - Flattens seller shop_name, city, coordinates.
+        - Exposes `is_available` as alias of `in_stock`.
+        - Exposes `distance_km` if nearby search was applied.
       properties:
         id:
           type: integer
@@ -1675,8 +1849,8 @@ components:
           type: boolean
         image_url:
           type: string
-          format: uri
-          maxLength: 200
+          nullable: true
+          readOnly: true
         images:
           type: array
           items:
@@ -1685,10 +1859,28 @@ components:
         in_stock:
           type: boolean
           readOnly: true
-        distance:
+        is_available:
+          type: boolean
+          readOnly: true
+        distance_km:
           type: string
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        shop_name:
+          type: string
+          readOnly: true
+        city:
+          type: string
+          readOnly: true
+          nullable: true
+        latitude:
+          type: string
+          nullable: true
+          readOnly: true
+        longitude:
+          type: string
+          nullable: true
           readOnly: true
         created_at:
           type: string
@@ -1700,19 +1892,29 @@ components:
           readOnly: true
       required:
       - category
+      - city
       - created_at
       - description
-      - distance
+      - distance_km
       - id
+      - image_url
       - images
       - in_stock
+      - is_available
+      - latitude
+      - longitude
       - name
       - price
       - seller
+      - shop_name
       - updated_at
     ProductCreate:
       type: object
-      description: Serializer for creating products
+      description: |-
+        Serializer for creating products
+
+        - Accepts `category_id` (FK).
+        - Accepts `image` (file upload).
       properties:
         category_id:
           type: integer
@@ -1734,25 +1936,71 @@ components:
           minimum: 0
         is_active:
           type: boolean
-        image_url:
+        image:
           type: string
           format: uri
-          maxLength: 200
+          nullable: true
+      required:
+      - description
+      - name
+      - price
+    ProductCreateRequest:
+      type: object
+      description: |-
+        Serializer for creating products
+
+        - Accepts `category_id` (FK).
+        - Accepts `image` (file upload).
+      properties:
+        category_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        stock_quantity:
+          type: integer
+          minimum: 0
+        is_active:
+          type: boolean
+        image:
+          type: string
+          format: binary
+          nullable: true
       required:
       - description
       - name
       - price
     ProductImage:
       type: object
-      description: Serializer for ProductImage model
+      description: |-
+        Serializer for ProductImage model
+
+        - Accepts uploaded file via `image`.
+        - Exposes `image_url` as absolute URL for frontend.
       properties:
         id:
           type: integer
           readOnly: true
-        image_url:
+        image:
           type: string
           format: uri
-          maxLength: 200
+        image_url:
+          type: string
+          nullable: true
+          readOnly: true
         is_primary:
           type: boolean
         order:
@@ -1764,7 +2012,67 @@ components:
       required:
       - created_at
       - id
+      - image
       - image_url
+    ProductImageRequest:
+      type: object
+      description: |-
+        Serializer for ProductImage model
+
+        - Accepts uploaded file via `image`.
+        - Exposes `image_url` as absolute URL for frontend.
+      properties:
+        image:
+          type: string
+          format: binary
+        is_primary:
+          type: boolean
+        order:
+          type: integer
+      required:
+      - image
+    ProductRequest:
+      type: object
+      description: |-
+        Serializer for Product model
+
+        API is shaped to match the marketplace UI:
+
+        - `image` is the uploaded file (write-only or optional).
+        - `image_url` is an absolute URL for the cover image.
+        - Flattens seller shop_name, city, coordinates.
+        - Exposes `is_available` as alias of `in_stock`.
+        - Exposes `distance_km` if nearby search was applied.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        stock_quantity:
+          type: integer
+          minimum: 0
+        is_active:
+          type: boolean
+        image:
+          type: string
+          format: binary
+          writeOnly: true
+          nullable: true
+      required:
+      - description
+      - name
+      - price
     Review:
       type: object
       description: Serializer for Review model
@@ -1803,6 +2111,21 @@ components:
       - seller_name
       - updated_at
       - user
+    ReviewRequest:
+      type: object
+      description: Serializer for Review model
+      properties:
+        seller:
+          type: integer
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+      required:
+      - rating
+      - seller
     SellerProfile:
       type: object
       description: Serializer for SellerProfile model
@@ -1861,7 +2184,7 @@ components:
       - user
     SellerProfileCreate:
       type: object
-      description: Serializer for creating seller profiles
+      description: Serializer for creating seller profiles together with their location
       properties:
         business_name:
           type: string
@@ -1876,6 +2199,95 @@ components:
       required:
       - business_name
       - location
+    SellerProfileCreateRequest:
+      type: object
+      description: Serializer for creating seller profiles together with their location
+      properties:
+        business_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        phone_number:
+          type: string
+          maxLength: 20
+        location:
+          $ref: '#/components/schemas/LocationRequest'
+      required:
+      - business_name
+      - location
+    SellerProfileRequest:
+      type: object
+      description: Serializer for SellerProfile model
+      properties:
+        business_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        phone_number:
+          type: string
+          maxLength: 20
+        is_verified:
+          type: boolean
+      required:
+      - business_name
+    TokenObtainPair:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    TokenObtainPairRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TokenVerifyRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - token
     User:
       type: object
       description: Serializer for User model
@@ -1908,13 +2320,70 @@ components:
       - date_joined
       - id
       - username
+    UserRegistrationRequest:
+      type: object
+      description: |-
+        Serializer for user registration
+
+        - Accepts username OR will generate it from email prefix.
+        - Requires password & password_confirm to match.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 8
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - password
+      - password_confirm
+      - username
+    UserRequest:
+      type: object
+      description: Serializer for User model
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - username
   securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: sessionid
-    tokenAuth:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: Token-based authentication with required prefix "Token"
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

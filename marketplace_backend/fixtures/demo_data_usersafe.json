@@ -1,0 +1,488 @@
+[
+  {
+    "model": "api.sellerprofile",
+    "pk": 2001,
+    "fields": {
+      "user": ["shop_microspace"],
+      "business_name": "Microspace Dodoma Electronics",
+      "description": "Duka la vifaa vya IT, laptops na accessories katikati ya jiji la Dodoma.",
+      "phone_number": "+255710000001",
+      "is_verified": true,
+      "rating": "4.50",
+      "total_sales": 120,
+      "created_at": "2025-11-25T10:05:00Z",
+      "updated_at": "2025-11-25T10:05:00Z"
+    }
+  },
+  {
+    "model": "api.sellerprofile",
+    "pk": 2002,
+    "fields": {
+      "user": ["shop_kariakoo_electronics"],
+      "business_name": "Kariakoo Electronics Dodoma",
+      "description": "Vifaa vya umeme, simu na accessories eneo la Madukani.",
+      "phone_number": "+255710000002",
+      "is_verified": true,
+      "rating": "4.20",
+      "total_sales": 80,
+      "created_at": "2025-11-25T10:05:00Z",
+      "updated_at": "2025-11-25T10:05:00Z"
+    }
+  },
+  {
+    "model": "api.sellerprofile",
+    "pk": 2003,
+    "fields": {
+      "user": ["shop_dodoma_furniture"],
+      "business_name": "Dodoma Furniture Hub",
+      "description": "Mabati, makabati, meza na viti kwa matumizi ya ofisini na nyumbani.",
+      "phone_number": "+255710000003",
+      "is_verified": true,
+      "rating": "4.00",
+      "total_sales": 60,
+      "created_at": "2025-11-25T10:05:00Z",
+      "updated_at": "2025-11-25T10:05:00Z"
+    }
+  },
+  {
+    "model": "api.sellerprofile",
+    "pk": 2004,
+    "fields": {
+      "user": ["shop_makole_mobile"],
+      "business_name": "Makole Mobile Store",
+      "description": "Simu janja, tablets na line za mitandao, eneo la Makole.",
+      "phone_number": "+255710000004",
+      "is_verified": false,
+      "rating": "3.80",
+      "total_sales": 40,
+      "created_at": "2025-11-25T10:05:00Z",
+      "updated_at": "2025-11-25T10:05:00Z"
+    }
+  },
+  {
+    "model": "api.sellerprofile",
+    "pk": 2005,
+    "fields": {
+      "user": ["shop_nzuguni_home"],
+      "business_name": "Nzuguni Home & Appliances",
+      "description": "Vifaa vya nyumbani na kitchen appliances eneo la Nzuguni.",
+      "phone_number": "+255710000005",
+      "is_verified": false,
+      "rating": "4.10",
+      "total_sales": 50,
+      "created_at": "2025-11-25T10:05:00Z",
+      "updated_at": "2025-11-25T10:05:00Z"
+    }
+  },
+
+  {
+    "model": "api.location",
+    "pk": 3001,
+    "fields": {
+      "seller": 2001,
+      "address": "Nyerere Square, Microspace Building",
+      "city": "Dodoma",
+      "state": "Dodoma Urban",
+      "country": "Tanzania",
+      "postal_code": "41101",
+      "latitude": "-6.16300000",
+      "longitude": "35.75160000",
+      "mapbox_place_id": "",
+      "created_at": "2025-11-25T10:10:00Z",
+      "updated_at": "2025-11-25T10:10:00Z"
+    }
+  },
+  {
+    "model": "api.location",
+    "pk": 3002,
+    "fields": {
+      "seller": 2002,
+      "address": "Madukani Street, Kariakoo Complex",
+      "city": "Dodoma",
+      "state": "Dodoma Urban",
+      "country": "Tanzania",
+      "postal_code": "41102",
+      "latitude": "-6.16750000",
+      "longitude": "35.75290000",
+      "mapbox_place_id": "",
+      "created_at": "2025-11-25T10:10:00Z",
+      "updated_at": "2025-11-25T10:10:00Z"
+    }
+  },
+  {
+    "model": "api.location",
+    "pk": 3003,
+    "fields": {
+      "seller": 2003,
+      "address": "Area C, Furniture Street",
+      "city": "Dodoma",
+      "state": "Dodoma Urban",
+      "country": "Tanzania",
+      "postal_code": "41103",
+      "latitude": "-6.16120000",
+      "longitude": "35.74480000",
+      "mapbox_place_id": "",
+      "created_at": "2025-11-25T10:10:00Z",
+      "updated_at": "2025-11-25T10:10:00Z"
+    }
+  },
+  {
+    "model": "api.location",
+    "pk": 3004,
+    "fields": {
+      "seller": 2004,
+      "address": "Makole Road, Near Bus Stand",
+      "city": "Dodoma",
+      "state": "Dodoma Urban",
+      "country": "Tanzania",
+      "postal_code": "41104",
+      "latitude": "-6.15870000",
+      "longitude": "35.75830000",
+      "mapbox_place_id": "",
+      "created_at": "2025-11-25T10:10:00Z",
+      "updated_at": "2025-11-25T10:10:00Z"
+    }
+  },
+  {
+    "model": "api.location",
+    "pk": 3005,
+    "fields": {
+      "seller": 2005,
+      "address": "Nzuguni, Near Market",
+      "city": "Dodoma",
+      "state": "Dodoma Urban",
+      "country": "Tanzania",
+      "postal_code": "41105",
+      "latitude": "-6.19200000",
+      "longitude": "35.76900000",
+      "mapbox_place_id": "",
+      "created_at": "2025-11-25T10:10:00Z",
+      "updated_at": "2025-11-25T10:10:00Z"
+    }
+  },
+
+  {
+    "model": "api.product",
+    "pk": 4001,
+    "fields": {
+      "seller": 2001,
+      "name": "HP EliteBook 840 G3",
+      "description": "Laptop ya ofisini, Core i5, 8GB RAM, 256GB SSD.",
+      "price": "650000.00",
+      "currency": "TZS",
+      "stock_quantity": 5,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4002,
+    "fields": {
+      "seller": 2001,
+      "name": "Dell Latitude 5490",
+      "description": "Refurbished laptop, Core i5 7th Gen, 8GB RAM, 256GB SSD.",
+      "price": "780000.00",
+      "currency": "TZS",
+      "stock_quantity": 3,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4003,
+    "fields": {
+      "seller": 2001,
+      "name": "Samsung Galaxy A24",
+      "description": "Smartphone mpya, 6GB RAM, 128GB storage.",
+      "price": "520000.00",
+      "currency": "TZS",
+      "stock_quantity": 10,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4004,
+    "fields": {
+      "seller": 2001,
+      "name": "Infinix Hot 40i",
+      "description": "Simu ya kijanja, betri kubwa, kamera nzuri kwa social media.",
+      "price": "320000.00",
+      "currency": "TZS",
+      "stock_quantity": 8,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+
+  {
+    "model": "api.product",
+    "pk": 4005,
+    "fields": {
+      "seller": 2002,
+      "name": "Tecno Spark 20",
+      "description": "Simu yenye kamera nzuri kwa picha za Instagram.",
+      "price": "280000.00",
+      "currency": "TZS",
+      "stock_quantity": 12,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4006,
+    "fields": {
+      "seller": 2002,
+      "name": "iTel P40",
+      "description": "Simu ya bei nafuu yenye betri ya kudumu.",
+      "price": "190000.00",
+      "currency": "TZS",
+      "stock_quantity": 15,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4007,
+    "fields": {
+      "seller": 2002,
+      "name": "Microwave Oven 20L",
+      "description": "Microwave ya jikoni, capacity 20L, digital timer.",
+      "price": "260000.00",
+      "currency": "TZS",
+      "stock_quantity": 4,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4008,
+    "fields": {
+      "seller": 2002,
+      "name": "Electric Kettle 1.8L",
+      "description": "Kettle ya umeme kwa matumizi ya nyumbani na ofisini.",
+      "price": "45000.00",
+      "currency": "TZS",
+      "stock_quantity": 20,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+
+  {
+    "model": "api.product",
+    "pk": 4009,
+    "fields": {
+      "seller": 2003,
+      "name": "Office Desk (1.2m)",
+      "description": "Meza ya ofisini imara, rangi ya brown.",
+      "price": "220000.00",
+      "currency": "TZS",
+      "stock_quantity": 6,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4010,
+    "fields": {
+      "seller": 2003,
+      "name": "Ergonomic Office Chair",
+      "description": "Kiti chenye adjustable height na back support.",
+      "price": "260000.00",
+      "currency": "TZS",
+      "stock_quantity": 4,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4011,
+    "fields": {
+      "seller": 2003,
+      "name": "Two-Door Wardrobe",
+      "description": "Kabati la nguo, rangi ya teak, compartments nyingi.",
+      "price": "380000.00",
+      "currency": "TZS",
+      "stock_quantity": 2,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4012,
+    "fields": {
+      "seller": 2003,
+      "name": "Blender 1.5L",
+      "description": "Blender ya juisi na smoothies, 1.5L, glass jar.",
+      "price": "85000.00",
+      "currency": "TZS",
+      "stock_quantity": 10,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+
+  {
+    "model": "api.product",
+    "pk": 4013,
+    "fields": {
+      "seller": 2004,
+      "name": "Huawei Y7p",
+      "description": "Simu ya kati yenye kamera tatu na storage kubwa.",
+      "price": "350000.00",
+      "currency": "TZS",
+      "stock_quantity": 7,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4014,
+    "fields": {
+      "seller": 2004,
+      "name": "Xiaomi Redmi 13C",
+      "description": "Simu maarufu yenye performance nzuri na betri kubwa.",
+      "price": "300000.00",
+      "currency": "TZS",
+      "stock_quantity": 9,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4015,
+    "fields": {
+      "seller": 2004,
+      "name": "Lenovo ThinkPad T480",
+      "description": "Laptop ya business, Core i5, 8GB RAM, 256GB SSD.",
+      "price": "820000.00",
+      "currency": "TZS",
+      "stock_quantity": 4,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4016,
+    "fields": {
+      "seller": 2004,
+      "name": "HP ProBook 440 G5",
+      "description": "Laptop compact kwa ofisi na field work.",
+      "price": "760000.00",
+      "currency": "TZS",
+      "stock_quantity": 3,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+
+  {
+    "model": "api.product",
+    "pk": 4017,
+    "fields": {
+      "seller": 2005,
+      "name": "Single Foam Mattress 3x6",
+      "description": "Godoro la futi 3x6, quality standard.",
+      "price": "120000.00",
+      "currency": "TZS",
+      "stock_quantity": 10,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4018,
+    "fields": {
+      "seller": 2005,
+      "name": "Four-Seater Sofa Set",
+      "description": "Seti ya sofa 4-seater, rangi kijivu.",
+      "price": "980000.00",
+      "currency": "TZS",
+      "stock_quantity": 2,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4019,
+    "fields": {
+      "seller": 2005,
+      "name": "Double Door Fridge 190L",
+      "description": "Friji ya matumizi ya nyumbani, double door.",
+      "price": "950000.00",
+      "currency": "TZS",
+      "stock_quantity": 3,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  },
+  {
+    "model": "api.product",
+    "pk": 4020,
+    "fields": {
+      "seller": 2005,
+      "name": "Gas Cooker 4 Burners + Oven",
+      "description": "Mechi ya gesi 4 burners na oven, full gas.",
+      "price": "650000.00",
+      "currency": "TZS",
+      "stock_quantity": 4,
+      "is_active": true,
+      "image": null,
+      "created_at": "2025-11-25T10:15:00Z",
+      "updated_at": "2025-11-25T10:15:00Z"
+    }
+  }
+]
