@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import apiClient from "../lib/apiClient";
-import { useAuth } from "../contexts/AuthContext";
+// import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
@@ -49,7 +49,7 @@ interface NearbySearchPayload {
 }
 
 const NearbyProductsPage: React.FC = () => {
-  const { user } = useAuth();
+  // const { user } = useAuth();
 
   const [latitude, setLatitude] = useState<string>("");
   const [longitude, setLongitude] = useState<string>("");
@@ -115,19 +115,19 @@ const NearbyProductsPage: React.FC = () => {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col bg-slate-50">
-        <MainHeader />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow p-4 text-sm">
-            You must be logged in to search nearby products.
-          </div>
-        </main>
-        <MainFooter />
-      </div>
-    );
-  }
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex flex-col bg-slate-50">
+  //       <MainHeader />
+  //       <main className="flex-1 flex items-center justify-center px-4">
+  //         <div className="bg-white rounded-lg shadow p-4 text-sm">
+  //           You must be logged in to search nearby products.
+  //         </div>
+  //       </main>
+  //       <MainFooter />
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">

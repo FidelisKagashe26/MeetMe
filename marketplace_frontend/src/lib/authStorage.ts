@@ -7,6 +7,9 @@ export interface User {
   first_name: string;
   last_name: string;
   date_joined: string;
+  is_seller?: boolean;
+  preferred_language?: "en" | "sw" | null;
+  theme?: "light" | "dark" | "system" | null;
 }
 
 export interface AuthData {

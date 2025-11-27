@@ -4,6 +4,35 @@ info:
   version: 1.0.0
   description: Location-based marketplace backend
 paths:
+  /api/auth/change-password/:
+    post:
+      operationId: auth_change_password_create
+      description: Change password for logged-in user
+      summary: Change password for current user
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleMessage'
+          description: ''
   /api/auth/jwt/create/:
     post:
       operationId: auth_jwt_create_create
@@ -155,10 +184,87 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Message'
+                $ref: '#/components/schemas/SimpleMessage'
           description: ''
         '400':
           description: Error while logging out
+  /api/auth/me/:
+    get:
+      operationId: auth_me_retrieve
+      description: |-
+        GET: return current user profile
+        PUT/PATCH: update basic fields (first_name, last_name, preferred_language, theme)
+      summary: Get or update current user profile
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: auth_me_update
+      description: |-
+        GET: return current user profile
+        PUT/PATCH: update basic fields (first_name, last_name, preferred_language, theme)
+      summary: Get or update current user profile
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: auth_me_partial_update
+      description: |-
+        GET: return current user profile
+        PUT/PATCH: update basic fields (first_name, last_name, preferred_language, theme)
+      summary: Get or update current user profile
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserSettingsUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserSettingsUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserSettingsUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
   /api/auth/register/:
     post:
       operationId: auth_register_create
@@ -191,6 +297,89 @@ paths:
           description: ''
         '400':
           description: Validation error
+  /api/auth/settings/:
+    get:
+      operationId: auth_settings_retrieve
+      description: |-
+        Manage user settings:
+        - first_name, last_name
+        - preferred_language: 'en' / 'sw'
+        - theme: 'light' / 'dark' / 'system'
+      summary: Get or update user settings (profile + preferences)
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    put:
+      operationId: auth_settings_update
+      description: |-
+        Manage user settings:
+        - first_name, last_name
+        - preferred_language: 'en' / 'sw'
+        - theme: 'light' / 'dark' / 'system'
+      summary: Get or update user settings (profile + preferences)
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    patch:
+      operationId: auth_settings_partial_update
+      description: |-
+        Manage user settings:
+        - first_name, last_name
+        - preferred_language: 'en' / 'sw'
+        - theme: 'light' / 'dark' / 'system'
+      summary: Get or update user settings (profile + preferences)
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserSettingsUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserSettingsUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserSettingsUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
   /api/categories/:
     get:
       operationId: categories_list
@@ -357,10 +546,139 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/conversations/:
+    get:
+      operationId: conversations_list
+      description: Conversation kati ya buyer na seller
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedConversationList'
+          description: ''
+    post:
+      operationId: conversations_create
+      description: Conversation kati ya buyer na seller
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/conversations/{id}/:
+    get:
+      operationId: conversations_retrieve
+      description: Conversation kati ya buyer na seller
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this conversation.
+        required: true
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    put:
+      operationId: conversations_update
+      description: Conversation kati ya buyer na seller
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this conversation.
+        required: true
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    patch:
+      operationId: conversations_partial_update
+      description: Conversation kati ya buyer na seller
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this conversation.
+        required: true
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    delete:
+      operationId: conversations_destroy
+      description: Conversation kati ya buyer na seller
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this conversation.
+        required: true
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/favorites/:
     get:
       operationId: favorites_list
-      description: ViewSet for user favorites
+      description: ViewSet for user favorites (sellers)
       parameters:
       - name: ordering
         required: false
@@ -394,7 +712,7 @@ paths:
           description: ''
     post:
       operationId: favorites_create
-      description: ViewSet for user favorites
+      description: ViewSet for user favorites (sellers)
       tags:
       - favorites
       security:
@@ -410,7 +728,7 @@ paths:
   /api/favorites/{id}/:
     get:
       operationId: favorites_retrieve
-      description: ViewSet for user favorites
+      description: ViewSet for user favorites (sellers)
       parameters:
       - in: path
         name: id
@@ -432,7 +750,7 @@ paths:
           description: ''
     put:
       operationId: favorites_update
-      description: ViewSet for user favorites
+      description: ViewSet for user favorites (sellers)
       parameters:
       - in: path
         name: id
@@ -454,7 +772,7 @@ paths:
           description: ''
     patch:
       operationId: favorites_partial_update
-      description: ViewSet for user favorites
+      description: ViewSet for user favorites (sellers)
       parameters:
       - in: path
         name: id
@@ -476,7 +794,7 @@ paths:
           description: ''
     delete:
       operationId: favorites_destroy
-      description: ViewSet for user favorites
+      description: ViewSet for user favorites (sellers)
       parameters:
       - in: path
         name: id
@@ -541,6 +859,557 @@ paths:
           description: ''
         '400':
           description: Bad request or invalid coordinates
+  /api/messages/:
+    get:
+      operationId: messages_list
+      description: Chat messages ndani ya conversation
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - messages
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessageList'
+          description: ''
+    post:
+      operationId: messages_create
+      description: Chat messages ndani ya conversation
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MessageCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MessageCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageCreate'
+          description: ''
+  /api/messages/{id}/:
+    get:
+      operationId: messages_retrieve
+      description: Chat messages ndani ya conversation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this message.
+        required: true
+      tags:
+      - messages
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+    put:
+      operationId: messages_update
+      description: Chat messages ndani ya conversation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this message.
+        required: true
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+    patch:
+      operationId: messages_partial_update
+      description: Chat messages ndani ya conversation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this message.
+        required: true
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMessageRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+    delete:
+      operationId: messages_destroy
+      description: Chat messages ndani ya conversation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this message.
+        required: true
+      tags:
+      - messages
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/notifications/:
+    get:
+      operationId: notifications_list
+      description: Notifications kwa user (orders, chat, n.k.)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+    post:
+      operationId: notifications_create
+      description: Notifications kwa user (orders, chat, n.k.)
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/{id}/:
+    get:
+      operationId: notifications_retrieve
+      description: Notifications kwa user (orders, chat, n.k.)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    put:
+      operationId: notifications_update
+      description: Notifications kwa user (orders, chat, n.k.)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    patch:
+      operationId: notifications_partial_update
+      description: Notifications kwa user (orders, chat, n.k.)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    delete:
+      operationId: notifications_destroy
+      description: Notifications kwa user (orders, chat, n.k.)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/notifications/mark_all_read/:
+    post:
+      operationId: notifications_mark_all_read_create
+      description: Tandika notifications zote kama zimesomwa
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/orders/:
+    get:
+      operationId: orders_list
+      description: Orders kati ya mnunuaji (buyer) na muuzaji (seller)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderList'
+          description: ''
+    post:
+      operationId: orders_create
+      description: Orders kati ya mnunuaji (buyer) na muuzaji (seller)
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderCreate'
+          description: ''
+  /api/orders/{id}/:
+    get:
+      operationId: orders_retrieve
+      description: Orders kati ya mnunuaji (buyer) na muuzaji (seller)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this order.
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+    put:
+      operationId: orders_update
+      description: Orders kati ya mnunuaji (buyer) na muuzaji (seller)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this order.
+        required: true
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+    patch:
+      operationId: orders_partial_update
+      description: Orders kati ya mnunuaji (buyer) na muuzaji (seller)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this order.
+        required: true
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrderRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+    delete:
+      operationId: orders_destroy
+      description: Orders kati ya mnunuaji (buyer) na muuzaji (seller)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this order.
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/orders/as_buyer/:
+    get:
+      operationId: orders_as_buyer_retrieve
+      description: Orders ambazo mimi ni buyer
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/orders/as_seller/:
+    get:
+      operationId: orders_as_seller_retrieve
+      description: Orders ambazo mimi ni seller
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
   /api/product-images/:
     get:
       operationId: product_images_list
@@ -713,6 +1582,204 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/product-likes/:
+    get:
+      operationId: product_likes_list
+      description: Likes kwa kila product (user mmoja a-like mara moja)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - product-likes
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductLikeList'
+          description: ''
+    post:
+      operationId: product_likes_create
+      description: Likes kwa kila product (user mmoja a-like mara moja)
+      tags:
+      - product-likes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductLike'
+          description: ''
+  /api/product-likes/{id}/:
+    get:
+      operationId: product_likes_retrieve
+      description: Likes kwa kila product (user mmoja a-like mara moja)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product like.
+        required: true
+      tags:
+      - product-likes
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductLike'
+          description: ''
+    put:
+      operationId: product_likes_update
+      description: Likes kwa kila product (user mmoja a-like mara moja)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product like.
+        required: true
+      tags:
+      - product-likes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductLike'
+          description: ''
+    patch:
+      operationId: product_likes_partial_update
+      description: Likes kwa kila product (user mmoja a-like mara moja)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product like.
+        required: true
+      tags:
+      - product-likes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductLikeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductLikeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductLikeRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductLike'
+          description: ''
+    delete:
+      operationId: product_likes_destroy
+      description: Likes kwa kila product (user mmoja a-like mara moja)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product like.
+        required: true
+      tags:
+      - product-likes
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/product-likes/toggle/:
+    post:
+      operationId: product_likes_toggle_create
+      description: Toggle like/unlike for a product
+      tags:
+      - product-likes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductLikeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductLike'
+          description: ''
   /api/products/:
     get:
       operationId: products_list
@@ -885,16 +1952,26 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/products/mine/:
+    get:
+      operationId: products_mine_retrieve
+      description: Products za muuzaji aliye login (seller dashboard)
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
   /api/products/nearby/:
     get:
       operationId: products_nearby_retrieve
-      description: |-
-        GET /api/products/nearby/?lat=...&lng=...&radius=10&search=...&location=...
-
-        Used by the main marketplace search page:
-        - reads HTML5 geolocation coordinates
-        - applies search + location filters
-        - returns products sorted by distance
+      description: GET /api/products/nearby/?lat=...&lng=...&radius=10&location=...&limit=10
       tags:
       - products
       security:
@@ -911,7 +1988,7 @@ paths:
   /api/products/search_nearby/:
     post:
       operationId: products_search_nearby_create
-      description: Advanced nearby search via POST body (still available if needed)
+      description: Advanced nearby search via POST body
       tags:
       - products
       requestBody:
@@ -1323,11 +2400,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/SellerProfile'
           description: ''
+  /api/sellers/me/:
+    get:
+      operationId: sellers_me_retrieve
+      description: Get seller profile for current user (if exists)
+      tags:
+      - sellers
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellerProfile'
+          description: ''
   /api/sellers/nearby/:
     get:
       operationId: sellers_nearby_retrieve
-      description: Get nearby sellers based on user's location (Haversine, no external
-        API)
+      description: Get nearby sellers based on user's location (Haversine)
       tags:
       - sellers
       security:
@@ -1385,6 +2478,69 @@ components:
           maxLength: 50
       required:
       - name
+    ChangePasswordRequest:
+      type: object
+      description: Serializer ya kubadili password
+      properties:
+        old_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        new_password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - new_password
+      - new_password_confirm
+      - old_password
+    Conversation:
+      type: object
+      description: Serializer kwa conversation kati ya buyer na seller
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        buyer:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        seller:
+          allOf:
+          - $ref: '#/components/schemas/SellerProfile'
+          readOnly: true
+        product:
+          allOf:
+          - $ref: '#/components/schemas/OrderProduct'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_message_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_message:
+          type: string
+          nullable: true
+          readOnly: true
+        unread_count:
+          type: integer
+          readOnly: true
+      required:
+      - buyer
+      - created_at
+      - id
+      - last_message
+      - last_message_at
+      - product
+      - seller
+      - unread_count
     DistanceRequestRequest:
       type: object
       description: Request body for distance calculation (Haversine)
@@ -1434,6 +2590,9 @@ components:
           allOf:
           - $ref: '#/components/schemas/SellerProfile'
           readOnly: true
+        seller_id:
+          type: integer
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -1442,6 +2601,7 @@ components:
       - created_at
       - id
       - seller
+      - seller_id
     JWTToken:
       type: object
       description: Response body for auth endpoints (register/login) with JWT
@@ -1569,12 +2729,284 @@ components:
       - refresh
     Message:
       type: object
-      description: Simple message response (e.g. logout)
+      description: Serializer kwa ujumbe mmoja kwenye conversation (read)
       properties:
-        message:
+        id:
+          type: integer
+          readOnly: true
+        conversation:
+          type: integer
+          readOnly: true
+        sender:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        text:
+          type: string
+        is_read:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - conversation
+      - created_at
+      - id
+      - is_read
+      - sender
+      - text
+    MessageCreate:
+      type: object
+      description: Serializer kwa kutuma message mpya (create)
+      properties:
+        conversation:
+          type: integer
+        text:
           type: string
       required:
-      - message
+      - conversation
+      - text
+    MessageCreateRequest:
+      type: object
+      description: Serializer kwa kutuma message mpya (create)
+      properties:
+        conversation:
+          type: integer
+        text:
+          type: string
+          minLength: 1
+      required:
+      - conversation
+      - text
+    MessageRequest:
+      type: object
+      description: Serializer kwa ujumbe mmoja kwenye conversation (read)
+      properties:
+        text:
+          type: string
+          minLength: 1
+      required:
+      - text
+    NotifTypeEnum:
+      enum:
+      - order_new
+      - order_status
+      - chat_message
+      - order_created
+      type: string
+      description: |-
+        * `order_new` - New order
+        * `order_status` - Order status update
+        * `chat_message` - Chat message
+        * `order_created` - Order created
+    Notification:
+      type: object
+      description: Serializer kwa notification (order mpya, message mpya, nk.)
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        notif_type:
+          $ref: '#/components/schemas/NotifTypeEnum'
+        title:
+          type: string
+          maxLength: 255
+        body:
+          type: string
+        data:
+          nullable: true
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - notif_type
+      - title
+      - user
+    NotificationRequest:
+      type: object
+      description: Serializer kwa notification (order mpya, message mpya, nk.)
+      properties:
+        notif_type:
+          $ref: '#/components/schemas/NotifTypeEnum'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        body:
+          type: string
+        data:
+          nullable: true
+        is_read:
+          type: boolean
+      required:
+      - notif_type
+      - title
+    Order:
+      type: object
+      description: Read serializer kwa Order (list/detail)
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          allOf:
+          - $ref: '#/components/schemas/OrderProduct'
+          readOnly: true
+        buyer:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        seller:
+          allOf:
+          - $ref: '#/components/schemas/SellerProfile'
+          readOnly: true
+        quantity:
+          type: integer
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        total_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        delivery_address:
+          type: string
+        contact_phone:
+          type: string
+          maxLength: 20
+        note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - buyer
+      - created_at
+      - id
+      - product
+      - seller
+      - status
+      - total_price
+      - unit_price
+      - updated_at
+    OrderCreate:
+      type: object
+      description: Create serializer kwa Order.
+      properties:
+        product:
+          type: integer
+        quantity:
+          type: integer
+        delivery_address:
+          type: string
+        contact_phone:
+          type: string
+          maxLength: 20
+        note:
+          type: string
+      required:
+      - product
+    OrderCreateRequest:
+      type: object
+      description: Create serializer kwa Order.
+      properties:
+        product:
+          type: integer
+        quantity:
+          type: integer
+        delivery_address:
+          type: string
+        contact_phone:
+          type: string
+          maxLength: 20
+        note:
+          type: string
+      required:
+      - product
+    OrderProduct:
+      type: object
+      description: Product summary ndani ya Order
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        image_url:
+          type: string
+          nullable: true
+          readOnly: true
+        shop_name:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - image_url
+      - name
+      - price
+      - shop_name
+    OrderProductRequest:
+      type: object
+      description: Product summary ndani ya Order
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+      required:
+      - name
+      - price
+    OrderRequest:
+      type: object
+      description: Read serializer kwa Order (list/detail)
+      properties:
+        quantity:
+          type: integer
+        delivery_address:
+          type: string
+        contact_phone:
+          type: string
+          maxLength: 20
+        note:
+          type: string
     PaginatedCategoryList:
       type: object
       required:
@@ -1598,6 +3030,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Category'
+    PaginatedConversationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conversation'
     PaginatedFavoriteList:
       type: object
       required:
@@ -1621,6 +3076,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Favorite'
+    PaginatedMessageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    PaginatedOrderList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
     PaginatedProductImageList:
       type: object
       required:
@@ -1644,6 +3168,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductImage'
+    PaginatedProductLikeList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductLike'
     PaginatedProductList:
       type: object
       required:
@@ -1726,6 +3273,42 @@ components:
         icon:
           type: string
           maxLength: 50
+    PatchedMessageRequest:
+      type: object
+      description: Serializer kwa ujumbe mmoja kwenye conversation (read)
+      properties:
+        text:
+          type: string
+          minLength: 1
+    PatchedNotificationRequest:
+      type: object
+      description: Serializer kwa notification (order mpya, message mpya, nk.)
+      properties:
+        notif_type:
+          $ref: '#/components/schemas/NotifTypeEnum'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        body:
+          type: string
+        data:
+          nullable: true
+        is_read:
+          type: boolean
+    PatchedOrderRequest:
+      type: object
+      description: Read serializer kwa Order (list/detail)
+      properties:
+        quantity:
+          type: integer
+        delivery_address:
+          type: string
+        contact_phone:
+          type: string
+          maxLength: 20
+        note:
+          type: string
     PatchedProductImageRequest:
       type: object
       description: |-
@@ -1741,18 +3324,22 @@ components:
           type: boolean
         order:
           type: integer
+    PatchedProductLikeRequest:
+      type: object
+      description: Simple serializer for a single like record
+      properties:
+        product:
+          type: integer
     PatchedProductRequest:
       type: object
       description: |-
-        Serializer for Product model
+        Serializer for Product model (read)
 
-        API is shaped to match the marketplace UI:
-
-        - `image` is the uploaded file (write-only or optional).
-        - `image_url` is an absolute URL for the cover image.
-        - Flattens seller shop_name, city, coordinates.
-        - Exposes `is_available` as alias of `in_stock`.
-        - Exposes `distance_km` if nearby search was applied.
+        - `image` main image
+        - `image_url` absolute URL
+        - flatten seller info
+        - distance_km from haversine
+        - likes_count & is_liked
       properties:
         name:
           type: string
@@ -1806,18 +3393,36 @@ components:
           maxLength: 20
         is_verified:
           type: boolean
+    PatchedUserSettingsUpdateRequest:
+      type: object
+      description: Update basic user info + preferences (profile page)
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        preferred_language:
+          $ref: '#/components/schemas/PreferredLanguageF0bEnum'
+        theme:
+          $ref: '#/components/schemas/ThemeA19Enum'
+    PreferredLanguageF0bEnum:
+      enum:
+      - en
+      - sw
+      type: string
+      description: |-
+        * `en` - en
+        * `sw` - sw
     Product:
       type: object
       description: |-
-        Serializer for Product model
+        Serializer for Product model (read)
 
-        API is shaped to match the marketplace UI:
-
-        - `image` is the uploaded file (write-only or optional).
-        - `image_url` is an absolute URL for the cover image.
-        - Flattens seller shop_name, city, coordinates.
-        - Exposes `is_available` as alias of `in_stock`.
-        - Exposes `distance_km` if nearby search was applied.
+        - `image` main image
+        - `image_url` absolute URL
+        - flatten seller info
+        - distance_km from haversine
+        - likes_count & is_liked
       properties:
         id:
           type: integer
@@ -1825,6 +3430,9 @@ components:
         seller:
           allOf:
           - $ref: '#/components/schemas/SellerProfile'
+          readOnly: true
+        seller_id:
+          type: integer
           readOnly: true
         category:
           allOf:
@@ -1882,6 +3490,12 @@ components:
           type: string
           nullable: true
           readOnly: true
+        likes_count:
+          type: integer
+          readOnly: true
+        is_liked:
+          type: boolean
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -1901,11 +3515,14 @@ components:
       - images
       - in_stock
       - is_available
+      - is_liked
       - latitude
+      - likes_count
       - longitude
       - name
       - price
       - seller
+      - seller_id
       - shop_name
       - updated_at
     ProductCreate:
@@ -2031,18 +3648,45 @@ components:
           type: integer
       required:
       - image
+    ProductLike:
+      type: object
+      description: Simple serializer for a single like record
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - product
+      - user
+    ProductLikeRequest:
+      type: object
+      description: Simple serializer for a single like record
+      properties:
+        product:
+          type: integer
+      required:
+      - product
     ProductRequest:
       type: object
       description: |-
-        Serializer for Product model
+        Serializer for Product model (read)
 
-        API is shaped to match the marketplace UI:
-
-        - `image` is the uploaded file (write-only or optional).
-        - `image_url` is an absolute URL for the cover image.
-        - Flattens seller shop_name, city, coordinates.
-        - Exposes `is_available` as alias of `in_stock`.
-        - Exposes `distance_km` if nearby search was applied.
+        - `image` main image
+        - `image_url` absolute URL
+        - flatten seller info
+        - distance_km from haversine
+        - likes_count & is_liked
       properties:
         name:
           type: string
@@ -2234,6 +3878,38 @@ components:
           type: boolean
       required:
       - business_name
+    SimpleMessage:
+      type: object
+      description: Simple message response (e.g. logout, success)
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    StatusEnum:
+      enum:
+      - pending
+      - accepted
+      - rejected
+      - cancelled
+      - completed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `accepted` - Accepted
+        * `rejected` - Rejected
+        * `cancelled` - Cancelled
+        * `completed` - Completed
+    ThemeA19Enum:
+      enum:
+      - light
+      - dark
+      - system
+      type: string
+      description: |-
+        * `light` - light
+        * `dark` - dark
+        * `system` - system
     TokenObtainPair:
       type: object
       properties:
@@ -2290,7 +3966,7 @@ components:
       - token
     User:
       type: object
-      description: Serializer for User model
+      description: Serializer kwa User model (ikiwa na info ya profile).
       properties:
         id:
           type: integer
@@ -2316,17 +3992,80 @@ components:
           type: string
           format: date-time
           readOnly: true
+        is_seller:
+          type: boolean
+          readOnly: true
+        preferred_language:
+          type: string
+          nullable: true
+          readOnly: true
+        theme:
+          type: string
+          nullable: true
+          readOnly: true
       required:
       - date_joined
       - id
+      - is_seller
+      - preferred_language
+      - theme
       - username
+    UserProfile:
+      type: object
+      description: |-
+        Profile ya user:
+        - is_seller: kama ni muuzaji au mnunuaji
+        - preferred_language: 'en' / 'sw'
+        - theme: 'light' / 'dark' / 'system'
+      properties:
+        is_seller:
+          type: boolean
+        preferred_language:
+          $ref: '#/components/schemas/UserProfilePreferredLanguageEnum'
+        theme:
+          $ref: '#/components/schemas/UserProfileThemeEnum'
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - updated_at
+    UserProfilePreferredLanguageEnum:
+      enum:
+      - en
+      - sw
+      type: string
+      description: |-
+        * `en` - English
+        * `sw` - Swahili
+    UserProfileThemeEnum:
+      enum:
+      - light
+      - dark
+      - system
+      type: string
+      description: |-
+        * `light` - Light
+        * `dark` - Dark
+        * `system` - System
     UserRegistrationRequest:
       type: object
       description: |-
-        Serializer for user registration
+        Serializer kwa user registration
 
-        - Accepts username OR will generate it from email prefix.
-        - Requires password & password_confirm to match.
+        - Accepts username OR tuna-generate kutoka email.
+        - Inahitaji password & password_confirm zilingane.
+        - is_seller: user achague kama ni seller au buyer.
+        - preferred_language & theme tunazi-set kwenye UserProfile.
       properties:
         username:
           type: string
@@ -2354,13 +4093,27 @@ components:
         last_name:
           type: string
           maxLength: 150
+        is_seller:
+          type: boolean
+          writeOnly: true
+          default: false
+        preferred_language:
+          allOf:
+          - $ref: '#/components/schemas/PreferredLanguageF0bEnum'
+          writeOnly: true
+          default: en
+        theme:
+          allOf:
+          - $ref: '#/components/schemas/ThemeA19Enum'
+          writeOnly: true
+          default: system
       required:
       - password
       - password_confirm
       - username
     UserRequest:
       type: object
-      description: Serializer for User model
+      description: Serializer kwa User model (ikiwa na info ya profile).
       properties:
         username:
           type: string
@@ -2382,6 +4135,18 @@ components:
           maxLength: 150
       required:
       - username
+    UserSettingsUpdateRequest:
+      type: object
+      description: Update basic user info + preferences (profile page)
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        preferred_language:
+          $ref: '#/components/schemas/PreferredLanguageF0bEnum'
+        theme:
+          $ref: '#/components/schemas/ThemeA19Enum'
   securitySchemes:
     jwtAuth:
       type: http

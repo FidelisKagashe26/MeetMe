@@ -99,8 +99,7 @@ type SellerTab = "profile" | "location" | "products";
 
 // HELPER: chukua picha kuu ya bidhaa (image_url / image / images[])
 const getMainProductImage = (p: MyProduct): string | null => {
-  const primary =
-    p.images?.find((img) => img.is_primary) ?? p.images?.[0];
+  const primary = p.images?.find((img) => img.is_primary) ?? p.images?.[0];
 
   return (
     p.image_url ||
@@ -111,7 +110,7 @@ const getMainProductImage = (p: MyProduct): string | null => {
 };
 
 const SellerProfilePage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const [form, setForm] = useState<SellerProfilePayload>({
     business_name: "",
@@ -182,8 +181,7 @@ const SellerProfilePage: React.FC = () => {
       // 🔐 MUHIMU: hakikisha muuzaji anaona BIDHAA ZAKE TU
       const mineOnly = all.filter(
         (p) =>
-          p.seller_id === sellerPk ||
-          (p.seller && p.seller.id === sellerPk)
+          p.seller_id === sellerPk || (p.seller && p.seller.id === sellerPk)
       );
 
       setMyProducts(mineOnly);
@@ -385,7 +383,9 @@ const SellerProfilePage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-xl md:text-2xl font-semibold text-slate-900">
-                {sellerId ? form.business_name || "Seller dashboard" : "Set up your seller account"}
+                {sellerId
+                  ? form.business_name || "Seller dashboard"
+                  : "Set up your seller account"}
               </h2>
               <p className="text-[11px] md:text-[12px] text-slate-500">
                 Manage your shop details, location and products from one place.
@@ -405,7 +405,9 @@ const SellerProfilePage: React.FC = () => {
                         : "bg-slate-100 text-slate-600"
                     }`}
                   >
-                    {sellerSummary.is_verified ? "Verified shop" : "Not verified"}
+                    {sellerSummary.is_verified
+                      ? "Verified shop"
+                      : "Not verified"}
                   </span>
                 </div>
               )}
@@ -421,12 +423,6 @@ const SellerProfilePage: React.FC = () => {
                 View public shop page
               </Link>
             )}
-            <button
-              onClick={logout}
-              className="px-3 py-1.5 rounded-full bg-red-500 text-white text-xs font-medium hover:bg-red-600"
-            >
-              Logout
-            </button>
           </div>
         </div>
 
@@ -467,15 +463,6 @@ const SellerProfilePage: React.FC = () => {
                   </button>
                 ))}
               </div>
-
-              {sellerId && (
-                <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-500">
-                  <span>Logged in as</span>
-                  <span className="font-medium text-slate-800">
-                    {user.username}
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* PROFILE / LOCATION FORMS */}
@@ -640,7 +627,8 @@ const SellerProfilePage: React.FC = () => {
                     <div className="mt-3">
                       <GoogleMapPreview center={mapCenter} height="260px" />
                       <p className="mt-1 text-[11px] text-slate-500">
-                        Ramani inaonyesha location kulingana na latitude & longitude ulizoweka.
+                        Ramani inaonyesha location kulingana na latitude &
+                        longitude ulizoweka.
                       </p>
                     </div>
                   </>
@@ -704,7 +692,7 @@ const SellerProfilePage: React.FC = () => {
                   </div>
                 ) : myProducts.length === 0 ? (
                   <div className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-2xl border border-dashed border-slate-200">
-                    You don't have any products yet. Start by adding a new
+                    You don&apos;t have any products yet. Start by adding a new
                     product.
                   </div>
                 ) : (

@@ -1,9 +1,10 @@
 // src/pages/ProductsPage.tsx
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import apiClient from "../lib/apiClient";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
+import { useAuth } from "../contexts/AuthContext";
 
 interface SellerMini {
   id: number;
@@ -36,6 +37,11 @@ interface Product {
 
   // gallery from backend
   images?: ProductImage[];
+
+  // likes info from backend (optional, kulingana na serializer yako)
+  likes_count?: number;
+  is_liked_by_me?: boolean;
+  is_liked?: boolean;
 }
 
 interface PaginatedProductList {
@@ -51,6 +57,10 @@ interface Coords {
 }
 
 const ProductsPage: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [count, setCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
@@ -77,6 +87,9 @@ const ProductsPage: React.FC = () => {
 
   // Help panel
   const [showHelp, setShowHelp] = useState<boolean>(false);
+
+  // Likes loading state kwa kila product
+  const [likeLoading, setLikeLoading] = useState<Record<number, boolean>>({});
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -187,6 +200,48 @@ const ProductsPage: React.FC = () => {
     );
   };
 
+  // ==== TOGGLE LIKE / UNLIKE ====
+  const handleToggleLike = async (productId: number) => {
+    if (!user) {
+      // msukume kwenye login na next param
+      const next = `${location.pathname}${location.search}`;
+      navigate(`/login?next=${encodeURIComponent(next)}`);
+      return;
+    }
+
+    setLikeLoading((prev) => ({ ...prev, [productId]: true }));
+
+    try {
+      // ProductLikeRequest inawezekana inaitwa { product: number }
+      await apiClient.post("/api/product-likes/toggle/", {
+        product: productId,
+      });
+
+      // refresh list ili likes_count & is_liked_by_me vijae kutoka backend
+      await fetchProducts();
+    } catch (err) {
+      console.error(err);
+      // unaweza kuweka toast / error hapa baadaye
+    } finally {
+      setLikeLoading((prev) => ({ ...prev, [productId]: false }));
+    }
+  };
+
+  // ==== OPEN CHAT FOR PRODUCT / SELLER ====
+  const handleOpenChat = (productId: number, sellerId?: number) => {
+    if (!user) {
+      const next = `${location.pathname}${location.search}`;
+      navigate(`/login?next=${encodeURIComponent(next)}`);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("product", String(productId));
+    if (sellerId) params.set("seller", String(sellerId));
+
+    navigate(`/chat?${params.toString()}`);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <MainHeader />
@@ -224,7 +279,7 @@ const ProductsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* HELP PANEL (imehamishwa hapa badala ya kujaa juu kabisa) */}
+          {/* HELP PANEL */}
           {showHelp && (
             <div className="mb-4 rounded-2xl border border-slate-200 bg-white/90 p-3 text-[11px] text-slate-600 shadow-sm">
               <p className="mb-1 font-medium text-slate-800">
@@ -244,15 +299,13 @@ const ProductsPage: React.FC = () => {
                   products zilizo karibu.
                 </li>
                 <li>
-                  Bofya <span className="font-semibold">"Visit shop"</span> kufungua
-                  shop yote, au{" "}
-                  <span className="font-semibold">"Map"</span> kufungua Google
-                  Maps.
+                  Bofya <span className="font-semibold">"View details"</span>{" "}
+                  kuona maelezo ya product na kuanza oda.
                 </li>
                 <li>
-                  Tumia <span className="font-semibold">"Clear location"</span> au{" "}
-                  <span className="font-semibold">"Clear all"</span> kuondoa
-                  filters na kuanza upya.
+                  Tumia heart icon ❤️ ku-like product, na{" "}
+                  <span className="font-semibold">Chat</span> kuzungumza na
+                  muuzaji.
                 </li>
               </ul>
             </div>
@@ -417,6 +470,11 @@ const ProductsPage: React.FC = () => {
 
               const mainImage = getMainImage(product);
 
+              const isLiked =
+                product.is_liked_by_me ?? product.is_liked ?? false;
+              const likesCount = product.likes_count ?? 0;
+              const isLikeBusy = likeLoading[product.id] || false;
+
               return (
                 <article
                   key={product.id}
@@ -434,9 +492,34 @@ const ProductsPage: React.FC = () => {
                         No image
                       </div>
                     )}
-                    <div className="absolute left-2 top-2 bg-white/90 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm line-clamp-1 max-w-[80%]">
+
+                    {/* Shop badge (top-left) */}
+                    <div className="absolute left-2 top-2 bg-white/90 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm line-clamp-1 max-w-[60%]">
                       {shopName}
                     </div>
+
+                    {/* Like button (top-right) */}
+                    <button
+                      type="button"
+                      onClick={() => void handleToggleLike(product.id)}
+                      disabled={isLikeBusy}
+                      className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium shadow-sm border border-slate-100 disabled:opacity-60"
+                    >
+                      <span
+                        className={
+                          isLiked
+                            ? "text-red-500 text-xs"
+                            : "text-slate-400 text-xs"
+                        }
+                      >
+                        ♥
+                      </span>
+                      {likesCount > 0 && (
+                        <span className="text-slate-700">{likesCount}</span>
+                      )}
+                    </button>
+
+                    {/* Distance (bottom-right) */}
                     {distanceLabel && (
                       <div className="absolute right-2 bottom-2 bg-slate-900/85 text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm">
                         {distanceLabel}
@@ -473,12 +556,23 @@ const ProductsPage: React.FC = () => {
                     </div>
 
                     <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
-                      <Link
-                        to={`/products/${product.id}`}
-                        className="px-3 py-1.5 rounded-full bg-slate-900 text-white font-medium hover:bg-black text-[11px]"
-                      >
-                        View details &amp; order
-                      </Link>
+                      <div className="flex gap-2">
+                        <Link
+                          to={`/products/${product.id}`}
+                          className="px-3 py-1.5 rounded-full bg-slate-900 text-white font-medium hover:bg-black text-[11px]"
+                        >
+                          View details &amp; order
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenChat(product.id, sellerId)
+                          }
+                          className="px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50"
+                        >
+                          Chat
+                        </button>
+                      </div>
 
                       <div className="flex items-center gap-1">
                         {sellerId && (

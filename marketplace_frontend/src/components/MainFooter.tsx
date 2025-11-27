@@ -50,7 +50,7 @@ const MainFooter: React.FC = () => {
       <div className="border-t border-slate-200">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between text-[11px] text-slate-400">
           <span>© {new Date().getFullYear()} Marketplace. All rights reserved.</span>
-          <span>Built for local buyers &amp; sellers 🧡</span>
+          <span>Built for local buyers &amp; sellers.</span>
         </div>
       </div>
     </footer>

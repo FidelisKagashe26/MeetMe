@@ -29,21 +29,27 @@ const RegisterPage: React.FC = () => {
     setError(null);
 
     if (password !== passwordConfirm) {
-      setError("Passwords do not match.");
+      setError("Nenosiri hazilingani. Hakikisha yamefanana.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Email ni lazima. Tafadhali weka barua pepe sahihi.");
       return;
     }
 
     setSubmitting(true);
 
-    // Schema inahitaji username; tukiona hajatupa,
-    // tunajaribu kuchukua prefix ya email.
+    // Kama username hajatoa, tutajaribu kuchukua kutoka kwenye email (kabla ya @)
     let finalUsername = username.trim();
     if (!finalUsername && email.includes("@")) {
       finalUsername = email.split("@")[0];
     }
 
     if (!finalUsername) {
-      setError("Username is required.");
+      setError(
+        "Username ni lazima. Andika username au tutaokota moja kutoka kwenye email."
+      );
       setSubmitting(false);
       return;
     }
@@ -51,13 +57,14 @@ const RegisterPage: React.FC = () => {
     try {
       await register({
         username: finalUsername,
-        email: email || undefined,
+        email,
         password,
         password_confirm: passwordConfirm,
         first_name: firstName || undefined,
         last_name: lastName || undefined,
       });
 
+      // Baada ya kusajili, mwendee alikotoka / alikotakiwa kwenda
       navigate(nextParam);
     } catch (err: unknown) {
       console.error(err);
@@ -65,19 +72,28 @@ const RegisterPage: React.FC = () => {
       if (axios.isAxiosError(err)) {
         const data = err.response?.data;
         if (data && typeof data === "object") {
-          // simple flatten ya kwanza
-          const firstKey = Object.keys(data)[0];
-          const value = (data as Record<string, unknown>)[firstKey];
-          if (Array.isArray(value) && value[0]) {
-            setError(String(value[0]));
+          const keys = Object.keys(data);
+          if (keys.length > 0) {
+            const firstKey = keys[0];
+            const value = (data as Record<string, unknown>)[firstKey];
+
+            if (Array.isArray(value) && value[0]) {
+              setError(String(value[0]));
+            } else if (typeof value === "string") {
+              setError(value);
+            } else {
+              setError(
+                "Imeshindikana kuunda akaunti. Hakikisha taarifa ulizoweka ni sahihi."
+              );
+            }
           } else {
-            setError("Failed to create account. Please check your details.");
+            setError("Imeshindikana kuunda akaunti. Tafadhali jaribu tena.");
           }
         } else {
-          setError("Failed to create account. Please try again.");
+          setError("Imeshindikana kuunda akaunti. Tafadhali jaribu tena.");
         }
       } else {
-        setError("Something went wrong. Please try again.");
+        setError("Kuna hitilafu ya ndani ya mfumo. Jaribu tena baadae.");
       }
     } finally {
       setSubmitting(false);
@@ -87,77 +103,81 @@ const RegisterPage: React.FC = () => {
   const disabled = submitting || authLoading;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
       <MainHeader />
 
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h1 className="text-lg font-semibold text-slate-900 mb-1">
-              Create your account
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+              Create your LINKA account
             </h1>
-            <p className="text-[12px] text-slate-500 mb-4">
-              An account helps sellers know who you are when you place an order.
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 mb-4">
+              Akaunti inakusaidia kununua na kuuza bidhaa kwa usalama.
+              Tutatumia email yako kwa login na taarifa muhimu kama kubadilisha
+              nenosiri.
             </p>
 
             {error && (
-              <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-100 p-2 rounded-lg">
+              <div className="mb-3 text-sm text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-600/40 p-2 rounded-lg">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-[11px] text-slate-600 mb-1">
+                <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
                   Username
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
+                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
                   placeholder="your-username"
                 />
-                <p className="mt-1 text-[10px] text-slate-400">
-                  If you leave this empty, we will generate a username from your email.
+                <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                  Ukiacha tupu, tutaokota username kutoka kwenye email yako
+                  (kabla ya @).
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <label className="block text-[11px] text-slate-600 mb-1">
-                    Email (optional)
+                  <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
+                    Email
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
+                    className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
                     placeholder="you@example.com"
+                    required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-600 mb-1">
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
                       First name (optional)
                     </label>
                     <input
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
                       placeholder="John"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-600 mb-1">
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
                       Last name (optional)
                     </label>
                     <input
                       type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
                       placeholder="Doe"
                     />
                   </div>
@@ -165,14 +185,14 @@ const RegisterPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 mb-1">
+                <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
                   Password
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
+                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
                   placeholder="••••••••"
                   required
                   minLength={8}
@@ -180,14 +200,14 @@ const RegisterPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 mb-1">
+                <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
                   Confirm password
                 </label>
                 <input
                   type="password"
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
+                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
                   placeholder="••••••••"
                   required
                   minLength={8}
@@ -203,7 +223,7 @@ const RegisterPage: React.FC = () => {
               </button>
             </form>
 
-            <div className="mt-4 text-[11px] text-slate-500">
+            <div className="mt-4 text-[11px] text-slate-500 dark:text-slate-400">
               Already have an account?{" "}
               <Link
                 to={`/login?next=${encodeURIComponent(nextParam)}`}
