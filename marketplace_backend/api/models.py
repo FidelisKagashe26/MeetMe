@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Avg, Count, Sum
 
 
 # =========================
@@ -14,7 +15,7 @@ class UserProfile(models.Model):
     - is_seller: role selection at registration
     - preferred_language: 'en' / 'sw'
     - theme: 'light' / 'dark' / 'system'
-    - avatar: profile picture
+    - avatar: profile picture (mtumiaji binafsi)
     """
     THEME_CHOICES = [
         ("light", "Light"),
@@ -64,6 +65,12 @@ class UserProfile(models.Model):
 class SellerProfile(models.Model):
     """
     Extended profile for users who are sellers
+
+    Tunatumia:
+    - user.profile.avatar    => picha binafsi ya user
+    - logo                   => logo ya biashara (brand ya duka)
+    - rating + rating_count  => wastani na idadi ya reviews
+    - total_sales + items_sold => mauzo yaliyokamilika
     """
     user = models.OneToOneField(
         User,
@@ -74,13 +81,29 @@ class SellerProfile(models.Model):
     description = models.TextField(blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     is_verified = models.BooleanField(default=False)
+
+    # wastani wa rating (1-5)
     rating = models.DecimalField(
         max_digits=3,
         decimal_places=2,
         default=0.0,
         validators=[MinValueValidator(0), MaxValueValidator(5)],
     )
+    # idadi ya reviews zilizotumika ku-compute rating
+    rating_count = models.PositiveIntegerField(default=0)
+
+    # idadi ya mauzo (orders zilizokamilika)
     total_sales = models.IntegerField(default=0)
+    # jumla ya units/items zilizouzwa kwenye hizo orders
+    items_sold = models.PositiveIntegerField(default=0)
+
+    # LOGO YA BIASHARA (inaenda kwenye chat header, shop page, n.k.)
+    logo = models.ImageField(
+        upload_to="shops/logos/",
+        blank=True,
+        null=True,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -90,6 +113,66 @@ class SellerProfile(models.Model):
 
     def __str__(self):
         return f"{self.business_name} - {self.user.username}"
+
+    # ---------- RATING LOGIC ----------
+    def recalculate_rating(self, commit: bool = True):
+        """
+        Recompute rating average + rating_count kutoka kwenye Review model.
+
+        Inaandika kwenye:
+        - self.rating
+        - self.rating_count
+        """
+        agg = self.reviews.aggregate(
+            avg=Avg("rating"),
+            count=Count("id"),
+        )
+        avg = agg.get("avg") or 0
+        count = agg.get("count") or 0
+
+        self.rating = round(float(avg), 2) if avg else 0.0
+        self.rating_count = int(count)
+
+        if commit:
+            self.save(update_fields=["rating", "rating_count"])
+
+        return self.rating, self.rating_count
+
+    @property
+    def has_rating(self) -> bool:
+        """
+        True kama seller ana angalau review moja.
+        """
+        return self.rating_count > 0
+
+    # ---------- SALES LOGIC ----------
+    def recalculate_sales(self, commit: bool = True):
+        """
+        Recompute mauzo yaliyokamilika (status='completed') kutoka kwenye Order.
+
+        Ina-update:
+        - total_sales : idadi ya orders completed
+        - items_sold  : jumla ya quantity kwenye orders hizo
+        """
+        # tunatumia related_name='orders' kutoka Order.seller
+        from .models import Order  # ikiwa app yako ni tofauti, adjust import
+
+        completed = self.orders.filter(status=Order.STATUS_COMPLETED)
+
+        agg = completed.aggregate(
+            orders=Count("id"),
+            qty=Sum("quantity"),
+        )
+        orders_count = agg.get("orders") or 0
+        qty_sum = agg.get("qty") or 0
+
+        self.total_sales = int(orders_count)
+        self.items_sold = int(qty_sum or 0)
+
+        if commit:
+            self.save(update_fields=["total_sales", "items_sold"])
+
+        return self.total_sales, self.items_sold
 
 
 class Location(models.Model):
@@ -199,13 +282,43 @@ class Product(models.Model):
 
     @property
     def likes_count(self):
-        # safe even kama hakuna like yoyote
+        """
+        Idadi ya likes kwa product hii.
+        Inatumia related_name='likes' kwenye ProductLike.
+        """
         return self.likes.count()
+
+    # ---------- SALES PER PRODUCT ----------
+    @property
+    def sales_count(self) -> int:
+        """
+        Idadi ya orders zilizokamilika (completed) kwa product hii.
+        """
+        from .models import Order
+        return (
+            self.orders.filter(status=Order.STATUS_COMPLETED)
+            .aggregate(c=Count("id"))
+            .get("c")
+            or 0
+        )
+
+    @property
+    def units_sold(self) -> int:
+        """
+        Jumla ya quantity iliyouzwa (sum ya quantity kwa orders completed) kwa product hii.
+        """
+        from .models import Order
+        return (
+            self.orders.filter(status=Order.STATUS_COMPLETED)
+            .aggregate(q=Sum("quantity"))
+            .get("q")
+            or 0
+        )
 
 
 class ProductImage(models.Model):
     """
-    Multiple images for products
+    Multiple images for products (gallery)
     """
     product = models.ForeignKey(
         Product,
@@ -399,6 +512,10 @@ class Order(models.Model):
 class Conversation(models.Model):
     """
     Chat conversation between buyer and seller, optionally per product
+
+    - buyer: User (mnunuzi)
+    - seller: SellerProfile (muuzaji + logo ya biashara)
+    - product: optional product inayojadiliwa
     """
     buyer = models.ForeignKey(
         User,
@@ -432,10 +549,55 @@ class Conversation(models.Model):
         return base
 
 
+class ConversationParticipantState(models.Model):
+    """
+    Hali ya kila user ndani ya conversation (kwa typing & read status)
+
+    - user: User (buyer au seller.user)
+    - conversation: convo husika
+    - is_typing: True kama yupo anatype sasa hivi
+    - last_typing_at: alionekana akitype mara ya mwisho lini
+    - last_seen_at: mara ya mwisho ku-open chat
+    - last_read_at: mara ya mwisho kusoma messages (kwa unread count)
+    """
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="participant_states",
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="conversation_states",
+    )
+    is_typing = models.BooleanField(default=False)
+    last_typing_at = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    last_read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "conversation_participant_states"
+        unique_together = ["conversation", "user"]
+        ordering = ["-last_seen_at"]
+
+    def __str__(self):
+        return f"State for {self.user.username} in convo #{self.conversation_id}"
+
+
 class Message(models.Model):
     """
     A single chat message
     """
+    STATUS_SENT = "sent"
+    STATUS_DELIVERED = "delivered"
+    STATUS_READ = "read"
+
+    STATUS_CHOICES = [
+        (STATUS_SENT, "Sent"),
+        (STATUS_DELIVERED, "Delivered"),
+        (STATUS_READ, "Read"),
+    ]
+
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
@@ -447,8 +609,17 @@ class Message(models.Model):
         related_name="messages",
     )
     text = models.TextField()
-    is_read = models.BooleanField(default=False)
+
+    # WhatsApp-like statuses
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_SENT,
+    )
+    is_read = models.BooleanField(default=False)  # kwa compatibility na logic za zamani
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "messages"
@@ -464,6 +635,15 @@ class Notification(models.Model):
     - new order
     - order status change
     - new chat message
+
+    Tutaweka payload ndani ya data:
+    {
+        "order_id": ...,
+        "conversation_id": ...,
+        "product_id": ...,
+        "seller_id": ...,
+        "buyer_id": ...
+    }
     """
     NOTIF_TYPE_CHOICES = [
         ("order_new", "New order"),

@@ -14,9 +14,26 @@ from .models import (
     Favorite,
     Order,
     Conversation,
+    ConversationParticipantState,
     Message,
     Notification,
 )
+
+
+# =========================
+#  HELPERS
+# =========================
+
+def _build_absolute_uri(request, file_field):
+    """
+    Helper: rudi absolute URL ya file (image) kama request ipo.
+    """
+    if not file_field:
+        return None
+    url = file_field.url
+    if request is None:
+        return url
+    return request.build_absolute_uri(url)
 
 
 # =========================
@@ -29,7 +46,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     - is_seller: kama ni muuzaji au mnunuaji
     - preferred_language: 'en' / 'sw'
     - theme: 'light' / 'dark' / 'system'
+    - avatar: profile picture
     """
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -38,20 +57,26 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "preferred_language",
             "theme",
             "avatar",
+            "avatar_url",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_avatar_url(self, obj):
+        request = self.context.get("request")
+        return _build_absolute_uri(request, obj.avatar)
 
 
 class UserSerializer(serializers.ModelSerializer):
     """
     Serializer kwa User model (ikiwa na info ya profile).
     """
-
     is_seller = serializers.SerializerMethodField()
     preferred_language = serializers.SerializerMethodField()
     theme = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -65,6 +90,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_seller",
             "preferred_language",
             "theme",
+            "avatar_url",
         ]
         read_only_fields = [
             "id",
@@ -72,6 +98,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_seller",
             "preferred_language",
             "theme",
+            "avatar_url",
         ]
 
     @extend_schema_field(serializers.BooleanField())
@@ -89,6 +116,47 @@ class UserSerializer(serializers.ModelSerializer):
         profile = getattr(obj, "profile", None)
         return profile.theme if profile else None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_avatar_url(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile and profile.avatar:
+            request = self.context.get("request")
+            return _build_absolute_uri(request, profile.avatar)
+        return None
+
+
+class UserMiniSerializer(serializers.ModelSerializer):
+    """
+    User mdogo kwa ajili ya chat, seller info, n.k.
+    """
+    avatar_url = serializers.SerializerMethodField()
+    is_seller = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "avatar_url",
+            "is_seller",
+        ]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_avatar_url(self, obj):
+        request = self.context.get("request")
+        profile = getattr(obj, "profile", None)
+        if profile and profile.avatar:
+            return _build_absolute_uri(request, profile.avatar)
+        return None
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_seller(self, obj):
+        profile = getattr(obj, "profile", None)
+        return bool(profile and profile.is_seller)
+
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """
@@ -105,12 +173,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     is_seller = serializers.BooleanField(write_only=True, default=False)
     preferred_language = serializers.ChoiceField(
-        choices=["en", "sw"],
+        choices=UserProfile.LANGUAGE_CHOICES,
         default="en",
         write_only=True,
     )
     theme = serializers.ChoiceField(
-        choices=["light", "dark", "system"],
+        choices=UserProfile.THEME_CHOICES,
         default="system",
         write_only=True,
     )
@@ -193,11 +261,11 @@ class UserSettingsUpdateSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
     preferred_language = serializers.ChoiceField(
-        choices=["en", "sw"],
+        choices=UserProfile.LANGUAGE_CHOICES,
         required=False,
     )
     theme = serializers.ChoiceField(
-        choices=["light", "dark", "system"],
+        choices=UserProfile.THEME_CHOICES,
         required=False,
     )
 
@@ -232,23 +300,34 @@ class LocationSerializer(serializers.ModelSerializer):
             "mapbox_place_id",
             "distance",
             "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class SellerProfileSerializer(serializers.ModelSerializer):
     """
-    Serializer for SellerProfile model
+    Full SellerProfile:
+
+    - user: full UserSerializer (ina profile info)
+    - location: LocationSerializer (ina distance kama umehesabiwa)
+    - logo_url: absolute URL
+    - rating, rating_count
+    - total_sales, items_sold
+    - distance: kwa seller (ikiwekwa na haversine kwenye view)
     """
 
     user = UserSerializer(read_only=True)
     location = LocationSerializer(read_only=True)
+
     distance = serializers.DecimalField(
         max_digits=10,
         decimal_places=2,
         read_only=True,
         required=False,
     )
+
+    logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = SellerProfile
@@ -260,7 +339,11 @@ class SellerProfileSerializer(serializers.ModelSerializer):
             "phone_number",
             "is_verified",
             "rating",
+            "rating_count",
             "total_sales",
+            "items_sold",
+            "logo",
+            "logo_url",
             "location",
             "distance",
             "created_at",
@@ -270,10 +353,45 @@ class SellerProfileSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "rating",
+            "rating_count",
             "total_sales",
+            "items_sold",
+            "distance",
             "created_at",
             "updated_at",
         ]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_logo_url(self, obj):
+        request = self.context.get("request")
+        return _build_absolute_uri(request, obj.logo)
+
+
+class SellerMiniSerializer(serializers.ModelSerializer):
+    """
+    Seller kwa matumizi ya ndani ya product / conversation headers.
+    """
+    logo_url = serializers.SerializerMethodField()
+    user = UserMiniSerializer(read_only=True)
+
+    class Meta:
+        model = SellerProfile
+        fields = [
+            "id",
+            "business_name",
+            "is_verified",
+            "rating",
+            "rating_count",
+            "total_sales",
+            "items_sold",
+            "logo_url",
+            "user",
+        ]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_logo_url(self, obj):
+        request = self.context.get("request")
+        return _build_absolute_uri(request, obj.logo)
 
 
 class SellerProfileCreateSerializer(serializers.ModelSerializer):
@@ -285,7 +403,7 @@ class SellerProfileCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SellerProfile
-        fields = ["business_name", "description", "phone_number", "location"]
+        fields = ["business_name", "description", "phone_number", "logo", "location"]
 
     def create(self, validated_data):
         location_data = validated_data.pop("location")
@@ -307,7 +425,14 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ["id", "name", "description", "icon", "product_count", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "icon",
+            "product_count",
+            "created_at",
+        ]
         read_only_fields = ["id", "created_at"]
 
 
@@ -346,15 +471,56 @@ class ProductImageSerializer(serializers.ModelSerializer):
 #  PRODUCT + LIKES
 # =========================
 
+class ProductMiniSerializer(serializers.ModelSerializer):
+    """
+    Product mdogo kwa chat header / notification payload.
+    """
+    image_url = serializers.SerializerMethodField()
+    likes_count = serializers.SerializerMethodField()
+    sales_count = serializers.SerializerMethodField()
+    units_sold = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "price",
+            "currency",
+            "image_url",
+            "likes_count",
+            "sales_count",
+            "units_sold",
+        ]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        return _build_absolute_uri(request, obj.image)
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_likes_count(self, obj):
+        return getattr(obj, "likes_count", obj.likes.count())
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_sales_count(self, obj):
+        return getattr(obj, "sales_count", obj.sales_count)
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_units_sold(self, obj):
+        return getattr(obj, "units_sold", obj.units_sold)
+
+
 class ProductSerializer(serializers.ModelSerializer):
     """
     Serializer for Product model (read)
 
     - `image` main image
     - `image_url` absolute URL
-    - flatten seller info
-    - distance_km from haversine
+    - seller: SellerProfileSerializer (ina rating, total_sales, location, distance)
+    - distance_km from haversine (source="distance" attribute on queryset)
     - likes_count & is_liked
+    - sales_count & units_sold (per product)
     """
 
     seller = SellerProfileSerializer(read_only=True)
@@ -387,6 +553,8 @@ class ProductSerializer(serializers.ModelSerializer):
 
     likes_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
+    sales_count = serializers.SerializerMethodField()
+    units_sold = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -413,10 +581,28 @@ class ProductSerializer(serializers.ModelSerializer):
             "longitude",
             "likes_count",
             "is_liked",
+            "sales_count",
+            "units_sold",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "seller", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "seller",
+            "created_at",
+            "updated_at",
+            "in_stock",
+            "is_available",
+            "distance_km",
+            "shop_name",
+            "city",
+            "latitude",
+            "longitude",
+            "likes_count",
+            "is_liked",
+            "sales_count",
+            "units_sold",
+        ]
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_image_url(self, obj):
@@ -453,6 +639,14 @@ class ProductSerializer(serializers.ModelSerializer):
         if not user or not user.is_authenticated:
             return False
         return ProductLike.objects.filter(user=user, product=obj).exists()
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_sales_count(self, obj):
+        return getattr(obj, "sales_count", obj.sales_count)
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_units_sold(self, obj):
+        return getattr(obj, "units_sold", obj.units_sold)
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
@@ -500,6 +694,11 @@ class ProductLikeSerializer(serializers.ModelSerializer):
 class ProductLikeToggleSerializer(serializers.Serializer):
     """
     Toggle like/unlike kwa product
+
+    Body:
+    {
+        "product_id": 123
+    }
     """
 
     product_id = serializers.IntegerField()
@@ -538,7 +737,11 @@ class FavoriteSerializer(serializers.ModelSerializer):
     """
 
     seller = SellerProfileSerializer(read_only=True)
-    seller_id = serializers.IntegerField(source="seller.id", read_only=True)
+    seller_id = serializers.PrimaryKeyRelatedField(
+        source="seller",
+        queryset=SellerProfile.objects.all(),
+        write_only=True,
+    )
 
     class Meta:
         model = Favorite
@@ -649,15 +852,16 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
 
 # =========================
-#  CHATTING (CONVERSATION & MESSAGE)
+#  CHATTING (CONVERSATION, TYPING, MESSAGE)
 # =========================
 
 class MessageSerializer(serializers.ModelSerializer):
     """
     Serializer kwa ujumbe mmoja kwenye conversation (read)
+    WhatsApp style: ina sender full mini, status, timestamps.
     """
 
-    sender = UserSerializer(read_only=True)
+    sender = UserMiniSerializer(read_only=True)
 
     class Meta:
         model = Message
@@ -666,15 +870,31 @@ class MessageSerializer(serializers.ModelSerializer):
             "conversation",
             "sender",
             "text",
+            "status",
             "is_read",
             "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "conversation", "sender", "is_read", "created_at"]
+        read_only_fields = [
+            "id",
+            "conversation",
+            "sender",
+            "status",
+            "is_read",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):
     """
     Serializer kwa kutuma message mpya (create)
+
+    Body:
+    {
+        "conversation": 1,
+        "text": "Habari, hii bidhaa bado ipo?"
+    }
     """
 
     class Meta:
@@ -682,16 +902,54 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         fields = ["conversation", "text"]
 
 
-class ConversationSerializer(serializers.ModelSerializer):
+class ConversationParticipantStateSerializer(serializers.ModelSerializer):
     """
-    Serializer kwa conversation kati ya buyer na seller
+    Hali ya kila user ndani ya conversation (typing, last_seen, last_read)
     """
 
-    buyer = UserSerializer(read_only=True)
-    seller = SellerProfileSerializer(read_only=True)
-    product = OrderProductSerializer(read_only=True)
+    user = UserMiniSerializer(read_only=True)
+
+    class Meta:
+        model = ConversationParticipantState
+        fields = [
+            "id",
+            "conversation",
+            "user",
+            "is_typing",
+            "last_typing_at",
+            "last_seen_at",
+            "last_read_at",
+        ]
+        read_only_fields = [
+            "id",
+            "conversation",
+            "user",
+            "last_typing_at",
+            "last_seen_at",
+            "last_read_at",
+        ]
+
+
+class ConversationSerializer(serializers.ModelSerializer):
+    """
+    Conversation LIST (chat list view)
+
+    Inarudisha:
+    - buyer (UserMini)
+    - seller (SellerMini)
+    - product (ProductMini)
+    - last_message (MessageSerializer)
+    - unread_count (kwa current user)
+    - is_typing_other_side (typing indicator)
+    """
+
+    buyer = UserMiniSerializer(read_only=True)
+    seller = SellerMiniSerializer(read_only=True)
+    product = ProductMiniSerializer(read_only=True, allow_null=True)
+
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    is_typing_other_side = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
@@ -704,30 +962,56 @@ class ConversationSerializer(serializers.ModelSerializer):
             "last_message_at",
             "last_message",
             "unread_count",
+            "is_typing_other_side",
         ]
-        read_only_fields = [
-            "id",
-            "buyer",
-            "seller",
-            "product",
-            "created_at",
-            "last_message_at",
-            "last_message",
-            "unread_count",
-        ]
+        read_only_fields = fields
 
-    @extend_schema_field(serializers.CharField(allow_null=True))
+    @extend_schema_field(MessageSerializer)
     def get_last_message(self, obj):
-        msg = obj.messages.order_by("-created_at").first()
-        return msg.text if msg else None
+        last_msg = obj.messages.order_by("-created_at").first()
+        if not last_msg:
+            return None
+        return MessageSerializer(last_msg, context=self.context).data
 
     @extend_schema_field(serializers.IntegerField())
     def get_unread_count(self, obj):
         request = self.context.get("request")
-        user = getattr(request, "user", None)
-        if not user or not user.is_authenticated:
+        if request is None or not request.user.is_authenticated:
             return 0
+        user = request.user
         return obj.messages.filter(is_read=False).exclude(sender=user).count()
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_typing_other_side(self, obj):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        user = request.user
+        # other participant(s) typing?
+        states = obj.participant_states.exclude(user=user)
+        return states.filter(is_typing=True).exists()
+
+
+class ConversationDetailSerializer(ConversationSerializer):
+    """
+    DETAIL ya conversation moja:
+
+    - fields zote za ConversationSerializer
+    - messages: list ya MessageSerializer
+    - participant_states: typing & read states
+    """
+
+    messages = MessageSerializer(many=True, read_only=True)
+    participant_states = ConversationParticipantStateSerializer(
+        many=True,
+        read_only=True,
+    )
+
+    class Meta(ConversationSerializer.Meta):
+        fields = ConversationSerializer.Meta.fields + [
+            "messages",
+            "participant_states",
+        ]
 
 
 # =========================
@@ -737,7 +1021,18 @@ class ConversationSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     """
     Serializer kwa notification (order mpya, message mpya, nk.)
+
+    data:
+    {
+      "order_id": ...,
+      "conversation_id": ...,
+      "product_id": ...,
+      "seller_id": ...,
+      "buyer_id": ...
+    }
     """
+
+    user = UserMiniSerializer(read_only=True)
 
     class Meta:
         model = Notification

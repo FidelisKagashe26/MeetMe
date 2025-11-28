@@ -28,6 +28,14 @@ interface ShopDetail {
   location?: ShopLocation | null;
 }
 
+// ====== PRODUCT IMAGE (GALLERY) ======
+interface ProductImage {
+  id: number;
+  image: string;
+  image_url?: string | null;
+  is_primary?: boolean;
+}
+
 interface ShopProduct {
   id: number;
   name: string;
@@ -38,6 +46,13 @@ interface ShopProduct {
   image?: string | null;
   city?: string | null;
   is_active?: boolean;
+
+  // gallery kutoka backend
+  images?: ProductImage[];
+
+  // likes info kutoka backend (optional)
+  likes_count?: number;
+  is_liked?: boolean;
 }
 
 interface PaginatedProductList {
@@ -45,6 +60,13 @@ interface PaginatedProductList {
   next: string | null;
   previous: string | null;
   results: ShopProduct[];
+}
+
+interface ProductLikeToggleResponse {
+  id: number;
+  product: number;
+  is_liked: boolean;
+  likes_count: number;
 }
 
 const ShopPage: React.FC = () => {
@@ -55,6 +77,10 @@ const ShopPage: React.FC = () => {
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // likes state
+  const [likeBusyId, setLikeBusyId] = useState<number | null>(null);
+  const [likeError, setLikeError] = useState<string | null>(null);
 
   const loadShop = async () => {
     if (!id) {
@@ -73,6 +99,7 @@ const ShopPage: React.FC = () => {
       params.set("seller_id", id);
       params.set("page", "1");
       params.set("page_size", "48");
+
       const productRes = await apiClient.get<PaginatedProductList>(
         `/api/products/?${params.toString()}`
       );
@@ -113,6 +140,62 @@ const ShopPage: React.FC = () => {
     if (Number.isNaN(n)) return null;
     return n.toFixed(1);
   })();
+
+  // ==== KUCHAGUA PICHA KUU KWA PRODUCT (kama ProductsPage) ====
+  const getMainImage = (product: ShopProduct): string | null => {
+    const primary =
+      product.images?.find((img) => img.is_primary) ?? product.images?.[0];
+
+    return (
+      product.image_url ||
+      product.image ||
+      (primary ? primary.image_url || primary.image : null) ||
+      null
+    );
+  };
+
+  // ==== LIKE TOGGLE HANDLER ====
+  const handleToggleLike = async (productId: number) => {
+    if (!productId) return;
+    setLikeError(null);
+    setLikeBusyId(productId);
+
+    try {
+      const res = await apiClient.post<ProductLikeToggleResponse>(
+        "/api/product-likes/toggle/",
+        {
+          product: productId,
+        }
+      );
+
+      const { is_liked, likes_count } = res.data;
+
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId
+            ? {
+                ...p,
+                is_liked,
+                likes_count,
+              }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      setLikeError(
+        "Imeshindikana kubadilisha like. Hakikisha umeingia (login) kisha jaribu tena."
+      );
+    } finally {
+      setLikeBusyId(null);
+    }
+  };
+
+  // ==== CHAT HANDLER (chat seller kuhusu product) ====
+  const handleOpenChat = (productId: number) => {
+    if (!id) return;
+    navigate(`/chat?product=${productId}&seller=${id}`);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -161,7 +244,6 @@ const ShopPage: React.FC = () => {
                 <div className="absolute inset-x-3 bottom-3 md:bottom-4 flex flex-col md:flex-row justify-between gap-3 pointer-events-none">
                   <div className="pointer-events-auto bg-white/95 rounded-2xl shadow px-3 py-3 flex-1 min-w-[220px] max-w-lg">
                     <div className="flex gap-3">
-                      {/* Placeholder logo in circle */}
                       <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-semibold">
                         {shopName.charAt(0).toUpperCase()}
                       </div>
@@ -244,6 +326,12 @@ const ShopPage: React.FC = () => {
                 </Link>
               </div>
 
+              {likeError && (
+                <div className="mb-2 text-[11px] text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+                  {likeError}
+                </div>
+              )}
+
               {products.length === 0 ? (
                 <div className="bg-white rounded-lg border border-dashed border-slate-200 p-4 text-[11px] text-slate-500">
                   This shop has no products listed yet.
@@ -251,12 +339,34 @@ const ShopPage: React.FC = () => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {products.map((p) => {
-                    const img = p.image_url || p.image || null;
+                    const img = getMainImage(p);
+                    const likesCount = p.likes_count ?? 0;
+                    const isLiked = Boolean(p.is_liked);
+
                     return (
                       <article
                         key={p.id}
-                        className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
+                        className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col overflow-hidden relative"
                       >
+                        {/* LIKE BADGE / BUTTON */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleLike(p.id)}
+                          disabled={likeBusyId === p.id}
+                          className="absolute right-2 top-2 z-10 px-2 py-1 rounded-full bg-white/90 border border-slate-200 text-[11px] flex items-center gap-1 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          <span
+                            className={
+                              isLiked
+                                ? "text-red-500 text-sm"
+                                : "text-slate-400 text-sm"
+                            }
+                          >
+                            {isLiked ? "♥" : "♡"}
+                          </span>
+                          <span className="text-slate-700">{likesCount}</span>
+                        </button>
+
                         {img ? (
                           <img
                             src={img}
@@ -286,6 +396,7 @@ const ShopPage: React.FC = () => {
                               </span>
                             )}
                           </div>
+
                           <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
                             <Link
                               to={`/products/${p.id}`}
@@ -293,6 +404,14 @@ const ShopPage: React.FC = () => {
                             >
                               View details
                             </Link>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenChat(p.id)}
+                              className="px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50"
+                            >
+                              Chat seller
+                            </button>
                           </div>
                         </div>
                       </article>

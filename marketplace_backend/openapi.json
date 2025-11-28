@@ -933,7 +933,7 @@
             },
             "post": {
                 "operationId": "conversations_create",
-                "description": "Conversation kati ya buyer na seller",
+                "description": "Create or reuse conversation between current user (buyer) and seller.\n\nBody:\n{\n  \"seller_id\": 1,\n  \"product_id\": 10  # optional\n}",
                 "tags": [
                     "conversations"
                 ],
@@ -950,7 +950,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Conversation"
+                                    "$ref": "#/components/schemas/ConversationDetail"
                                 }
                             }
                         },
@@ -990,7 +990,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Conversation"
+                                    "$ref": "#/components/schemas/ConversationDetail"
                                 }
                             }
                         },
@@ -1106,6 +1106,86 @@
                 }
             }
         },
+        "/api/conversations/{id}/mark_seen/": {
+            "post": {
+                "operationId": "conversations_mark_seen_create",
+                "description": "Tandika messages zote (za upande mwingine) kama zimesomwa\nna update participant_state (last_seen_at, last_read_at).",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this conversation.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "conversations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Conversation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/conversations/{id}/typing/": {
+            "post": {
+                "operationId": "conversations_typing_create",
+                "description": "Update typing state kwa current user kwenye conversation hii.\n\nBody:\n{\n  \"is_typing\": true/false\n}",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this conversation.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "conversations"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Conversation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/favorites/": {
             "get": {
                 "operationId": "favorites_list",
@@ -1169,6 +1249,26 @@
                 "tags": [
                     "favorites"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -1247,6 +1347,26 @@
                 "tags": [
                     "favorites"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -1285,6 +1405,25 @@
                 "tags": [
                     "favorites"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedFavoriteRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedFavoriteRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedFavoriteRequest"
+                            }
+                        }
+                    }
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -1345,6 +1484,26 @@
                 "tags": [
                     "favorites"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FavoriteRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -1699,6 +1858,66 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/messages/{id}/mark_read/": {
+            "post": {
+                "operationId": "messages_mark_read_create",
+                "description": "Tandika ujumbe mmoja kama umesomwa (READ) kwa current user.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this message.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MessageRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MessageRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MessageRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Message"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -2960,7 +3179,7 @@
         "/api/product-likes/toggle/": {
             "post": {
                 "operationId": "product_likes_toggle_create",
-                "description": "Toggle like/unlike for a product",
+                "description": "Toggle like/unlike for a product\n\nBody:\n{\n  \"product_id\": 123\n}",
                 "tags": [
                     "product-likes"
                 ],
@@ -4080,8 +4299,7 @@
                     },
                     {
                         "BearerAuth": []
-                    },
-                    {}
+                    }
                 ],
                 "responses": {
                     "200": {
@@ -4215,7 +4433,7 @@
             },
             "Conversation": {
                 "type": "object",
-                "description": "Serializer kwa conversation kati ya buyer na seller",
+                "description": "Conversation LIST (chat list view)\n\nInarudisha:\n- buyer (UserMini)\n- seller (SellerMini)\n- product (ProductMini)\n- last_message (MessageSerializer)\n- unread_count (kwa current user)\n- is_typing_other_side (typing indicator)",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -4224,7 +4442,7 @@
                     "buyer": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/User"
+                                "$ref": "#/components/schemas/UserMini"
                             }
                         ],
                         "readOnly": true
@@ -4232,7 +4450,7 @@
                     "seller": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/SellerProfile"
+                                "$ref": "#/components/schemas/SellerMini"
                             }
                         ],
                         "readOnly": true
@@ -4240,10 +4458,11 @@
                     "product": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/OrderProduct"
+                                "$ref": "#/components/schemas/ProductMini"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "created_at": {
                         "type": "string",
@@ -4256,12 +4475,19 @@
                         "readOnly": true
                     },
                     "last_message": {
-                        "type": "string",
-                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Message"
+                            }
+                        ],
                         "readOnly": true
                     },
                     "unread_count": {
                         "type": "integer",
+                        "readOnly": true
+                    },
+                    "is_typing_other_side": {
+                        "type": "boolean",
                         "readOnly": true
                     }
                 },
@@ -4269,12 +4495,161 @@
                     "buyer",
                     "created_at",
                     "id",
+                    "is_typing_other_side",
                     "last_message",
                     "last_message_at",
                     "product",
                     "seller",
                     "unread_count"
                 ]
+            },
+            "ConversationDetail": {
+                "type": "object",
+                "description": "DETAIL ya conversation moja:\n\n- fields zote za ConversationSerializer\n- messages: list ya MessageSerializer\n- participant_states: typing & read states",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "buyer": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/UserMini"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "seller": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SellerMini"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "product": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ProductMini"
+                            }
+                        ],
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "last_message_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "last_message": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Message"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "unread_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "is_typing_other_side": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Message"
+                        },
+                        "readOnly": true
+                    },
+                    "participant_states": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ConversationParticipantState"
+                        },
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "buyer",
+                    "created_at",
+                    "id",
+                    "is_typing_other_side",
+                    "last_message",
+                    "last_message_at",
+                    "messages",
+                    "participant_states",
+                    "product",
+                    "seller",
+                    "unread_count"
+                ]
+            },
+            "ConversationParticipantState": {
+                "type": "object",
+                "description": "Hali ya kila user ndani ya conversation (typing, last_seen, last_read)",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "conversation": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "user": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/UserMini"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "is_typing": {
+                        "type": "boolean"
+                    },
+                    "last_typing_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_seen_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "last_read_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "conversation",
+                    "id",
+                    "last_read_at",
+                    "last_seen_at",
+                    "last_typing_at",
+                    "user"
+                ]
+            },
+            "ConversationParticipantStateRequest": {
+                "type": "object",
+                "description": "Hali ya kila user ndani ya conversation (typing, last_seen, last_read)",
+                "properties": {
+                    "is_typing": {
+                        "type": "boolean"
+                    }
+                }
             },
             "DistanceRequestRequest": {
                 "type": "object",
@@ -4342,10 +4717,6 @@
                         ],
                         "readOnly": true
                     },
-                    "seller_id": {
-                        "type": "integer",
-                        "readOnly": true
-                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -4355,7 +4726,19 @@
                 "required": [
                     "created_at",
                     "id",
-                    "seller",
+                    "seller"
+                ]
+            },
+            "FavoriteRequest": {
+                "type": "object",
+                "description": "Serializer for Favorite model",
+                "properties": {
+                    "seller_id": {
+                        "type": "integer",
+                        "writeOnly": true
+                    }
+                },
+                "required": [
                     "seller_id"
                 ]
             },
@@ -4430,6 +4813,11 @@
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -4440,7 +4828,8 @@
                     "distance",
                     "id",
                     "latitude",
-                    "longitude"
+                    "longitude",
+                    "updated_at"
                 ]
             },
             "LocationRequest": {
@@ -4526,7 +4915,7 @@
             },
             "Message": {
                 "type": "object",
-                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)",
+                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender full mini, status, timestamps.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -4539,7 +4928,7 @@
                     "sender": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/User"
+                                "$ref": "#/components/schemas/UserMini"
                             }
                         ],
                         "readOnly": true
@@ -4547,11 +4936,24 @@
                     "text": {
                         "type": "string"
                     },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/MessageStatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
                     "is_read": {
                         "type": "boolean",
                         "readOnly": true
                     },
                     "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
@@ -4563,12 +4965,14 @@
                     "id",
                     "is_read",
                     "sender",
-                    "text"
+                    "status",
+                    "text",
+                    "updated_at"
                 ]
             },
             "MessageCreate": {
                 "type": "object",
-                "description": "Serializer kwa kutuma message mpya (create)",
+                "description": "Serializer kwa kutuma message mpya (create)\n\nBody:\n{\n    \"conversation\": 1,\n    \"text\": \"Habari, hii bidhaa bado ipo?\"\n}",
                 "properties": {
                     "conversation": {
                         "type": "integer"
@@ -4584,7 +4988,7 @@
             },
             "MessageCreateRequest": {
                 "type": "object",
-                "description": "Serializer kwa kutuma message mpya (create)",
+                "description": "Serializer kwa kutuma message mpya (create)\n\nBody:\n{\n    \"conversation\": 1,\n    \"text\": \"Habari, hii bidhaa bado ipo?\"\n}",
                 "properties": {
                     "conversation": {
                         "type": "integer"
@@ -4601,7 +5005,7 @@
             },
             "MessageRequest": {
                 "type": "object",
-                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)",
+                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender full mini, status, timestamps.",
                 "properties": {
                     "text": {
                         "type": "string",
@@ -4611,6 +5015,15 @@
                 "required": [
                     "text"
                 ]
+            },
+            "MessageStatusEnum": {
+                "enum": [
+                    "sent",
+                    "delivered",
+                    "read"
+                ],
+                "type": "string",
+                "description": "* `sent` - Sent\n* `delivered` - Delivered\n* `read` - Read"
             },
             "NotifTypeEnum": {
                 "enum": [
@@ -4624,14 +5037,18 @@
             },
             "Notification": {
                 "type": "object",
-                "description": "Serializer kwa notification (order mpya, message mpya, nk.)",
+                "description": "Serializer kwa notification (order mpya, message mpya, nk.)\n\ndata:\n{\n  \"order_id\": ...,\n  \"conversation_id\": ...,\n  \"product_id\": ...,\n  \"seller_id\": ...,\n  \"buyer_id\": ...\n}",
                 "properties": {
                     "id": {
                         "type": "integer",
                         "readOnly": true
                     },
                     "user": {
-                        "type": "integer",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/UserMini"
+                            }
+                        ],
                         "readOnly": true
                     },
                     "notif_type": {
@@ -4666,7 +5083,7 @@
             },
             "NotificationRequest": {
                 "type": "object",
-                "description": "Serializer kwa notification (order mpya, message mpya, nk.)",
+                "description": "Serializer kwa notification (order mpya, message mpya, nk.)\n\ndata:\n{\n  \"order_id\": ...,\n  \"conversation_id\": ...,\n  \"product_id\": ...,\n  \"seller_id\": ...,\n  \"buyer_id\": ...\n}",
                 "properties": {
                     "notif_type": {
                         "$ref": "#/components/schemas/NotifTypeEnum"
@@ -4741,7 +5158,7 @@
                     "status": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/StatusEnum"
+                                "$ref": "#/components/schemas/OrderStatusEnum"
                             }
                         ],
                         "readOnly": true
@@ -4911,6 +5328,17 @@
                         "type": "string"
                     }
                 }
+            },
+            "OrderStatusEnum": {
+                "enum": [
+                    "pending",
+                    "accepted",
+                    "rejected",
+                    "cancelled",
+                    "completed"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `accepted` - Accepted\n* `rejected` - Rejected\n* `cancelled` - Cancelled\n* `completed` - Completed"
             },
             "PaginatedCategoryList": {
                 "type": "object",
@@ -5271,9 +5699,19 @@
                     }
                 }
             },
+            "PatchedFavoriteRequest": {
+                "type": "object",
+                "description": "Serializer for Favorite model",
+                "properties": {
+                    "seller_id": {
+                        "type": "integer",
+                        "writeOnly": true
+                    }
+                }
+            },
             "PatchedMessageRequest": {
                 "type": "object",
-                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)",
+                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender full mini, status, timestamps.",
                 "properties": {
                     "text": {
                         "type": "string",
@@ -5283,7 +5721,7 @@
             },
             "PatchedNotificationRequest": {
                 "type": "object",
-                "description": "Serializer kwa notification (order mpya, message mpya, nk.)",
+                "description": "Serializer kwa notification (order mpya, message mpya, nk.)\n\ndata:\n{\n  \"order_id\": ...,\n  \"conversation_id\": ...,\n  \"product_id\": ...,\n  \"seller_id\": ...,\n  \"buyer_id\": ...\n}",
                 "properties": {
                     "notif_type": {
                         "$ref": "#/components/schemas/NotifTypeEnum"
@@ -5350,7 +5788,7 @@
             },
             "PatchedProductRequest": {
                 "type": "object",
-                "description": "Serializer for Product model (read)\n\n- `image` main image\n- `image_url` absolute URL\n- flatten seller info\n- distance_km from haversine\n- likes_count & is_liked",
+                "description": "Serializer for Product model (read)\n\n- `image` main image\n- `image_url` absolute URL\n- seller: SellerProfileSerializer (ina rating, total_sales, location, distance)\n- distance_km from haversine (source=\"distance\" attribute on queryset)\n- likes_count & is_liked\n- sales_count & units_sold (per product)",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -5405,7 +5843,7 @@
             },
             "PatchedSellerProfileRequest": {
                 "type": "object",
-                "description": "Serializer for SellerProfile model",
+                "description": "Full SellerProfile:\n\n- user: full UserSerializer (ina profile info)\n- location: LocationSerializer (ina distance kama umehesabiwa)\n- logo_url: absolute URL\n- rating, rating_count\n- total_sales, items_sold\n- distance: kwa seller (ikiwekwa na haversine kwenye view)",
                 "properties": {
                     "business_name": {
                         "type": "string",
@@ -5421,6 +5859,11 @@
                     },
                     "is_verified": {
                         "type": "boolean"
+                    },
+                    "logo": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
                     }
                 }
             },
@@ -5435,24 +5878,24 @@
                         "type": "string"
                     },
                     "preferred_language": {
-                        "$ref": "#/components/schemas/PreferredLanguageF0bEnum"
+                        "$ref": "#/components/schemas/PreferredLanguageEnum"
                     },
                     "theme": {
-                        "$ref": "#/components/schemas/ThemeA19Enum"
+                        "$ref": "#/components/schemas/ThemeEnum"
                     }
                 }
             },
-            "PreferredLanguageF0bEnum": {
+            "PreferredLanguageEnum": {
                 "enum": [
                     "en",
                     "sw"
                 ],
                 "type": "string",
-                "description": "* `en` - en\n* `sw` - sw"
+                "description": "* `en` - English\n* `sw` - Swahili"
             },
             "Product": {
                 "type": "object",
-                "description": "Serializer for Product model (read)\n\n- `image` main image\n- `image_url` absolute URL\n- flatten seller info\n- distance_km from haversine\n- likes_count & is_liked",
+                "description": "Serializer for Product model (read)\n\n- `image` main image\n- `image_url` absolute URL\n- seller: SellerProfileSerializer (ina rating, total_sales, location, distance)\n- distance_km from haversine (source=\"distance\" attribute on queryset)\n- likes_count & is_liked\n- sales_count & units_sold (per product)",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -5554,6 +5997,14 @@
                         "type": "boolean",
                         "readOnly": true
                     },
+                    "sales_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "units_sold": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -5582,9 +6033,11 @@
                     "longitude",
                     "name",
                     "price",
+                    "sales_count",
                     "seller",
                     "seller_id",
                     "shop_name",
+                    "units_sold",
                     "updated_at"
                 ]
             },
@@ -5772,9 +6225,83 @@
                     "product"
                 ]
             },
+            "ProductMini": {
+                "type": "object",
+                "description": "Product mdogo kwa chat header / notification payload.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "maxLength": 3
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "likes_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "sales_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "units_sold": {
+                        "type": "integer",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "image_url",
+                    "likes_count",
+                    "name",
+                    "price",
+                    "sales_count",
+                    "units_sold"
+                ]
+            },
+            "ProductMiniRequest": {
+                "type": "object",
+                "description": "Product mdogo kwa chat header / notification payload.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                    },
+                    "price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 3
+                    }
+                },
+                "required": [
+                    "name",
+                    "price"
+                ]
+            },
             "ProductRequest": {
                 "type": "object",
-                "description": "Serializer for Product model (read)\n\n- `image` main image\n- `image_url` absolute URL\n- flatten seller info\n- distance_km from haversine\n- likes_count & is_liked",
+                "description": "Serializer for Product model (read)\n\n- `image` main image\n- `image_url` absolute URL\n- seller: SellerProfileSerializer (ina rating, total_sales, location, distance)\n- distance_km from haversine (source=\"distance\" attribute on queryset)\n- likes_count & is_liked\n- sales_count & units_sold (per product)",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -5888,9 +6415,90 @@
                     "seller"
                 ]
             },
+            "SellerMini": {
+                "type": "object",
+                "description": "Seller kwa matumizi ya ndani ya product / conversation headers.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "business_name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "is_verified": {
+                        "type": "boolean"
+                    },
+                    "rating": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,1}(?:\\.\\d{0,2})?$"
+                    },
+                    "rating_count": {
+                        "type": "integer"
+                    },
+                    "total_sales": {
+                        "type": "integer"
+                    },
+                    "items_sold": {
+                        "type": "integer"
+                    },
+                    "logo_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "user": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/UserMini"
+                            }
+                        ],
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "business_name",
+                    "id",
+                    "logo_url",
+                    "user"
+                ]
+            },
+            "SellerMiniRequest": {
+                "type": "object",
+                "description": "Seller kwa matumizi ya ndani ya product / conversation headers.",
+                "properties": {
+                    "business_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                    },
+                    "is_verified": {
+                        "type": "boolean"
+                    },
+                    "rating": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,1}(?:\\.\\d{0,2})?$"
+                    },
+                    "rating_count": {
+                        "type": "integer"
+                    },
+                    "total_sales": {
+                        "type": "integer"
+                    },
+                    "items_sold": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "business_name"
+                ]
+            },
             "SellerProfile": {
                 "type": "object",
-                "description": "Serializer for SellerProfile model",
+                "description": "Full SellerProfile:\n\n- user: full UserSerializer (ina profile info)\n- location: LocationSerializer (ina distance kama umehesabiwa)\n- logo_url: absolute URL\n- rating, rating_count\n- total_sales, items_sold\n- distance: kwa seller (ikiwekwa na haversine kwenye view)",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -5924,8 +6532,26 @@
                         "pattern": "^-?\\d{0,1}(?:\\.\\d{0,2})?$",
                         "readOnly": true
                     },
+                    "rating_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "total_sales": {
                         "type": "integer",
+                        "readOnly": true
+                    },
+                    "items_sold": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "logo": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "logo_url": {
+                        "type": "string",
+                        "nullable": true,
                         "readOnly": true
                     },
                     "location": {
@@ -5958,8 +6584,11 @@
                     "created_at",
                     "distance",
                     "id",
+                    "items_sold",
                     "location",
+                    "logo_url",
                     "rating",
+                    "rating_count",
                     "total_sales",
                     "updated_at",
                     "user"
@@ -5979,6 +6608,11 @@
                     "phone_number": {
                         "type": "string",
                         "maxLength": 20
+                    },
+                    "logo": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
                     },
                     "location": {
                         "$ref": "#/components/schemas/Location"
@@ -6005,6 +6639,11 @@
                         "type": "string",
                         "maxLength": 20
                     },
+                    "logo": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
+                    },
                     "location": {
                         "$ref": "#/components/schemas/LocationRequest"
                     }
@@ -6016,7 +6655,7 @@
             },
             "SellerProfileRequest": {
                 "type": "object",
-                "description": "Serializer for SellerProfile model",
+                "description": "Full SellerProfile:\n\n- user: full UserSerializer (ina profile info)\n- location: LocationSerializer (ina distance kama umehesabiwa)\n- logo_url: absolute URL\n- rating, rating_count\n- total_sales, items_sold\n- distance: kwa seller (ikiwekwa na haversine kwenye view)",
                 "properties": {
                     "business_name": {
                         "type": "string",
@@ -6032,6 +6671,11 @@
                     },
                     "is_verified": {
                         "type": "boolean"
+                    },
+                    "logo": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -6050,25 +6694,14 @@
                     "message"
                 ]
             },
-            "StatusEnum": {
-                "enum": [
-                    "pending",
-                    "accepted",
-                    "rejected",
-                    "cancelled",
-                    "completed"
-                ],
-                "type": "string",
-                "description": "* `pending` - Pending\n* `accepted` - Accepted\n* `rejected` - Rejected\n* `cancelled` - Cancelled\n* `completed` - Completed"
-            },
-            "ThemeA19Enum": {
+            "ThemeEnum": {
                 "enum": [
                     "light",
                     "dark",
                     "system"
                 ],
                 "type": "string",
-                "description": "* `light` - light\n* `dark` - dark\n* `system` - system"
+                "description": "* `light` - Light\n* `dark` - Dark\n* `system` - System"
             },
             "TokenObtainPair": {
                 "type": "object",
@@ -6193,9 +6826,15 @@
                         "type": "string",
                         "nullable": true,
                         "readOnly": true
+                    },
+                    "avatar_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
                     }
                 },
                 "required": [
+                    "avatar_url",
                     "date_joined",
                     "id",
                     "is_seller",
@@ -6204,23 +6843,103 @@
                     "username"
                 ]
             },
+            "UserMini": {
+                "type": "object",
+                "description": "User mdogo kwa ajili ya chat, seller info, n.k.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "username": {
+                        "type": "string",
+                        "description": "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                        "pattern": "^[\\w.@+-]+$",
+                        "maxLength": 150
+                    },
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email address",
+                        "maxLength": 254
+                    },
+                    "avatar_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "is_seller": {
+                        "type": "boolean",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "avatar_url",
+                    "id",
+                    "is_seller",
+                    "username"
+                ]
+            },
+            "UserMiniRequest": {
+                "type": "object",
+                "description": "User mdogo kwa ajili ya chat, seller info, n.k.",
+                "properties": {
+                    "username": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                        "pattern": "^[\\w.@+-]+$",
+                        "maxLength": 150
+                    },
+                    "first_name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "title": "Email address",
+                        "maxLength": 254
+                    }
+                },
+                "required": [
+                    "username"
+                ]
+            },
             "UserProfile": {
                 "type": "object",
-                "description": "Profile ya user:\n- is_seller: kama ni muuzaji au mnunuaji\n- preferred_language: 'en' / 'sw'\n- theme: 'light' / 'dark' / 'system'",
+                "description": "Profile ya user:\n- is_seller: kama ni muuzaji au mnunuaji\n- preferred_language: 'en' / 'sw'\n- theme: 'light' / 'dark' / 'system'\n- avatar: profile picture",
                 "properties": {
                     "is_seller": {
                         "type": "boolean"
                     },
                     "preferred_language": {
-                        "$ref": "#/components/schemas/UserProfilePreferredLanguageEnum"
+                        "$ref": "#/components/schemas/PreferredLanguageEnum"
                     },
                     "theme": {
-                        "$ref": "#/components/schemas/UserProfileThemeEnum"
+                        "$ref": "#/components/schemas/ThemeEnum"
                     },
                     "avatar": {
                         "type": "string",
                         "format": "uri",
                         "nullable": true
+                    },
+                    "avatar_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
                     },
                     "created_at": {
                         "type": "string",
@@ -6234,26 +6953,10 @@
                     }
                 },
                 "required": [
+                    "avatar_url",
                     "created_at",
                     "updated_at"
                 ]
-            },
-            "UserProfilePreferredLanguageEnum": {
-                "enum": [
-                    "en",
-                    "sw"
-                ],
-                "type": "string",
-                "description": "* `en` - English\n* `sw` - Swahili"
-            },
-            "UserProfileThemeEnum": {
-                "enum": [
-                    "light",
-                    "dark",
-                    "system"
-                ],
-                "type": "string",
-                "description": "* `light` - Light\n* `dark` - Dark\n* `system` - System"
             },
             "UserRegistrationRequest": {
                 "type": "object",
@@ -6298,7 +7001,7 @@
                     "preferred_language": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/PreferredLanguageF0bEnum"
+                                "$ref": "#/components/schemas/PreferredLanguageEnum"
                             }
                         ],
                         "writeOnly": true,
@@ -6307,7 +7010,7 @@
                     "theme": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/ThemeA19Enum"
+                                "$ref": "#/components/schemas/ThemeEnum"
                             }
                         ],
                         "writeOnly": true,
@@ -6361,10 +7064,10 @@
                         "type": "string"
                     },
                     "preferred_language": {
-                        "$ref": "#/components/schemas/PreferredLanguageF0bEnum"
+                        "$ref": "#/components/schemas/PreferredLanguageEnum"
                     },
                     "theme": {
-                        "$ref": "#/components/schemas/ThemeA19Enum"
+                        "$ref": "#/components/schemas/ThemeEnum"
                     }
                 }
             }

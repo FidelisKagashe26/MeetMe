@@ -577,7 +577,14 @@ paths:
           description: ''
     post:
       operationId: conversations_create
-      description: Conversation kati ya buyer na seller
+      description: |-
+        Create or reuse conversation between current user (buyer) and seller.
+
+        Body:
+        {
+          "seller_id": 1,
+          "product_id": 10  # optional
+        }
       tags:
       - conversations
       security:
@@ -588,7 +595,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                $ref: '#/components/schemas/ConversationDetail'
           description: ''
   /api/conversations/{id}/:
     get:
@@ -611,7 +618,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                $ref: '#/components/schemas/ConversationDetail'
           description: ''
     put:
       operationId: conversations_update
@@ -675,6 +682,60 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/conversations/{id}/mark_seen/:
+    post:
+      operationId: conversations_mark_seen_create
+      description: |-
+        Tandika messages zote (za upande mwingine) kama zimesomwa
+        na update participant_state (last_seen_at, last_read_at).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this conversation.
+        required: true
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/conversations/{id}/typing/:
+    post:
+      operationId: conversations_typing_create
+      description: |-
+        Update typing state kwa current user kwenye conversation hii.
+
+        Body:
+        {
+          "is_typing": true/false
+        }
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this conversation.
+        required: true
+      tags:
+      - conversations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
   /api/favorites/:
     get:
       operationId: favorites_list
@@ -715,6 +776,18 @@ paths:
       description: ViewSet for user favorites (sellers)
       tags:
       - favorites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+        required: true
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -760,6 +833,18 @@ paths:
         required: true
       tags:
       - favorites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+        required: true
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -782,6 +867,17 @@ paths:
         required: true
       tags:
       - favorites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFavoriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFavoriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFavoriteRequest'
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -816,6 +912,18 @@ paths:
       description: Toggle favorite status for a seller
       tags:
       - favorites
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FavoriteRequest'
+        required: true
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1023,6 +1131,41 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/messages/{id}/mark_read/:
+    post:
+      operationId: messages_mark_read_create
+      description: Tandika ujumbe mmoja kama umesomwa (READ) kwa current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this message.
+        required: true
+      tags:
+      - messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
   /api/notifications/:
     get:
       operationId: notifications_list
@@ -1755,7 +1898,13 @@ paths:
   /api/product-likes/toggle/:
     post:
       operationId: product_likes_toggle_create
-      description: Toggle like/unlike for a product
+      description: |-
+        Toggle like/unlike for a product
+
+        Body:
+        {
+          "product_id": 123
+        }
       tags:
       - product-likes
       requestBody:
@@ -2409,7 +2558,6 @@ paths:
       security:
       - jwtAuth: []
       - BearerAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -2500,23 +2648,33 @@ components:
       - old_password
     Conversation:
       type: object
-      description: Serializer kwa conversation kati ya buyer na seller
+      description: |-
+        Conversation LIST (chat list view)
+
+        Inarudisha:
+        - buyer (UserMini)
+        - seller (SellerMini)
+        - product (ProductMini)
+        - last_message (MessageSerializer)
+        - unread_count (kwa current user)
+        - is_typing_other_side (typing indicator)
       properties:
         id:
           type: integer
           readOnly: true
         buyer:
           allOf:
-          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/UserMini'
           readOnly: true
         seller:
           allOf:
-          - $ref: '#/components/schemas/SellerProfile'
+          - $ref: '#/components/schemas/SellerMini'
           readOnly: true
         product:
           allOf:
-          - $ref: '#/components/schemas/OrderProduct'
+          - $ref: '#/components/schemas/ProductMini'
           readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -2526,21 +2684,134 @@ components:
           format: date-time
           readOnly: true
         last_message:
-          type: string
-          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/Message'
           readOnly: true
         unread_count:
           type: integer
+          readOnly: true
+        is_typing_other_side:
+          type: boolean
           readOnly: true
       required:
       - buyer
       - created_at
       - id
+      - is_typing_other_side
       - last_message
       - last_message_at
       - product
       - seller
       - unread_count
+    ConversationDetail:
+      type: object
+      description: |-
+        DETAIL ya conversation moja:
+
+        - fields zote za ConversationSerializer
+        - messages: list ya MessageSerializer
+        - participant_states: typing & read states
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        buyer:
+          allOf:
+          - $ref: '#/components/schemas/UserMini'
+          readOnly: true
+        seller:
+          allOf:
+          - $ref: '#/components/schemas/SellerMini'
+          readOnly: true
+        product:
+          allOf:
+          - $ref: '#/components/schemas/ProductMini'
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_message_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_message:
+          allOf:
+          - $ref: '#/components/schemas/Message'
+          readOnly: true
+        unread_count:
+          type: integer
+          readOnly: true
+        is_typing_other_side:
+          type: boolean
+          readOnly: true
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+          readOnly: true
+        participant_states:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationParticipantState'
+          readOnly: true
+      required:
+      - buyer
+      - created_at
+      - id
+      - is_typing_other_side
+      - last_message
+      - last_message_at
+      - messages
+      - participant_states
+      - product
+      - seller
+      - unread_count
+    ConversationParticipantState:
+      type: object
+      description: Hali ya kila user ndani ya conversation (typing, last_seen, last_read)
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        conversation:
+          type: integer
+          readOnly: true
+        user:
+          allOf:
+          - $ref: '#/components/schemas/UserMini'
+          readOnly: true
+        is_typing:
+          type: boolean
+        last_typing_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_seen_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_read_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - conversation
+      - id
+      - last_read_at
+      - last_seen_at
+      - last_typing_at
+      - user
+    ConversationParticipantStateRequest:
+      type: object
+      description: Hali ya kila user ndani ya conversation (typing, last_seen, last_read)
+      properties:
+        is_typing:
+          type: boolean
     DistanceRequestRequest:
       type: object
       description: Request body for distance calculation (Haversine)
@@ -2590,9 +2861,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/SellerProfile'
           readOnly: true
-        seller_id:
-          type: integer
-          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -2601,6 +2869,14 @@ components:
       - created_at
       - id
       - seller
+    FavoriteRequest:
+      type: object
+      description: Serializer for Favorite model
+      properties:
+        seller_id:
+          type: integer
+          writeOnly: true
+      required:
       - seller_id
     JWTToken:
       type: object
@@ -2657,6 +2933,10 @@ components:
           type: string
           format: date-time
           readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
       required:
       - address
       - city
@@ -2666,6 +2946,7 @@ components:
       - id
       - latitude
       - longitude
+      - updated_at
     LocationRequest:
       type: object
       description: Serializer for Location model
@@ -2729,7 +3010,9 @@ components:
       - refresh
     Message:
       type: object
-      description: Serializer kwa ujumbe mmoja kwenye conversation (read)
+      description: |-
+        Serializer kwa ujumbe mmoja kwenye conversation (read)
+        WhatsApp style: ina sender full mini, status, timestamps.
       properties:
         id:
           type: integer
@@ -2739,14 +3022,22 @@ components:
           readOnly: true
         sender:
           allOf:
-          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/UserMini'
           readOnly: true
         text:
           type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MessageStatusEnum'
+          readOnly: true
         is_read:
           type: boolean
           readOnly: true
         created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
           type: string
           format: date-time
           readOnly: true
@@ -2756,10 +3047,19 @@ components:
       - id
       - is_read
       - sender
+      - status
       - text
+      - updated_at
     MessageCreate:
       type: object
-      description: Serializer kwa kutuma message mpya (create)
+      description: |-
+        Serializer kwa kutuma message mpya (create)
+
+        Body:
+        {
+            "conversation": 1,
+            "text": "Habari, hii bidhaa bado ipo?"
+        }
       properties:
         conversation:
           type: integer
@@ -2770,7 +3070,14 @@ components:
       - text
     MessageCreateRequest:
       type: object
-      description: Serializer kwa kutuma message mpya (create)
+      description: |-
+        Serializer kwa kutuma message mpya (create)
+
+        Body:
+        {
+            "conversation": 1,
+            "text": "Habari, hii bidhaa bado ipo?"
+        }
       properties:
         conversation:
           type: integer
@@ -2782,13 +3089,25 @@ components:
       - text
     MessageRequest:
       type: object
-      description: Serializer kwa ujumbe mmoja kwenye conversation (read)
+      description: |-
+        Serializer kwa ujumbe mmoja kwenye conversation (read)
+        WhatsApp style: ina sender full mini, status, timestamps.
       properties:
         text:
           type: string
           minLength: 1
       required:
       - text
+    MessageStatusEnum:
+      enum:
+      - sent
+      - delivered
+      - read
+      type: string
+      description: |-
+        * `sent` - Sent
+        * `delivered` - Delivered
+        * `read` - Read
     NotifTypeEnum:
       enum:
       - order_new
@@ -2803,13 +3122,24 @@ components:
         * `order_created` - Order created
     Notification:
       type: object
-      description: Serializer kwa notification (order mpya, message mpya, nk.)
+      description: |-
+        Serializer kwa notification (order mpya, message mpya, nk.)
+
+        data:
+        {
+          "order_id": ...,
+          "conversation_id": ...,
+          "product_id": ...,
+          "seller_id": ...,
+          "buyer_id": ...
+        }
       properties:
         id:
           type: integer
           readOnly: true
         user:
-          type: integer
+          allOf:
+          - $ref: '#/components/schemas/UserMini'
           readOnly: true
         notif_type:
           $ref: '#/components/schemas/NotifTypeEnum'
@@ -2834,7 +3164,17 @@ components:
       - user
     NotificationRequest:
       type: object
-      description: Serializer kwa notification (order mpya, message mpya, nk.)
+      description: |-
+        Serializer kwa notification (order mpya, message mpya, nk.)
+
+        data:
+        {
+          "order_id": ...,
+          "conversation_id": ...,
+          "product_id": ...,
+          "seller_id": ...,
+          "buyer_id": ...
+        }
       properties:
         notif_type:
           $ref: '#/components/schemas/NotifTypeEnum'
@@ -2884,7 +3224,7 @@ components:
           readOnly: true
         status:
           allOf:
-          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/OrderStatusEnum'
           readOnly: true
         delivery_address:
           type: string
@@ -3007,6 +3347,20 @@ components:
           maxLength: 20
         note:
           type: string
+    OrderStatusEnum:
+      enum:
+      - pending
+      - accepted
+      - rejected
+      - cancelled
+      - completed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `accepted` - Accepted
+        * `rejected` - Rejected
+        * `cancelled` - Cancelled
+        * `completed` - Completed
     PaginatedCategoryList:
       type: object
       required:
@@ -3273,16 +3627,35 @@ components:
         icon:
           type: string
           maxLength: 50
+    PatchedFavoriteRequest:
+      type: object
+      description: Serializer for Favorite model
+      properties:
+        seller_id:
+          type: integer
+          writeOnly: true
     PatchedMessageRequest:
       type: object
-      description: Serializer kwa ujumbe mmoja kwenye conversation (read)
+      description: |-
+        Serializer kwa ujumbe mmoja kwenye conversation (read)
+        WhatsApp style: ina sender full mini, status, timestamps.
       properties:
         text:
           type: string
           minLength: 1
     PatchedNotificationRequest:
       type: object
-      description: Serializer kwa notification (order mpya, message mpya, nk.)
+      description: |-
+        Serializer kwa notification (order mpya, message mpya, nk.)
+
+        data:
+        {
+          "order_id": ...,
+          "conversation_id": ...,
+          "product_id": ...,
+          "seller_id": ...,
+          "buyer_id": ...
+        }
       properties:
         notif_type:
           $ref: '#/components/schemas/NotifTypeEnum'
@@ -3337,9 +3710,10 @@ components:
 
         - `image` main image
         - `image_url` absolute URL
-        - flatten seller info
-        - distance_km from haversine
+        - seller: SellerProfileSerializer (ina rating, total_sales, location, distance)
+        - distance_km from haversine (source="distance" attribute on queryset)
         - likes_count & is_liked
+        - sales_count & units_sold (per product)
       properties:
         name:
           type: string
@@ -3380,7 +3754,15 @@ components:
           type: string
     PatchedSellerProfileRequest:
       type: object
-      description: Serializer for SellerProfile model
+      description: |-
+        Full SellerProfile:
+
+        - user: full UserSerializer (ina profile info)
+        - location: LocationSerializer (ina distance kama umehesabiwa)
+        - logo_url: absolute URL
+        - rating, rating_count
+        - total_sales, items_sold
+        - distance: kwa seller (ikiwekwa na haversine kwenye view)
       properties:
         business_name:
           type: string
@@ -3393,6 +3775,10 @@ components:
           maxLength: 20
         is_verified:
           type: boolean
+        logo:
+          type: string
+          format: binary
+          nullable: true
     PatchedUserSettingsUpdateRequest:
       type: object
       description: Update basic user info + preferences (profile page)
@@ -3402,17 +3788,17 @@ components:
         last_name:
           type: string
         preferred_language:
-          $ref: '#/components/schemas/PreferredLanguageF0bEnum'
+          $ref: '#/components/schemas/PreferredLanguageEnum'
         theme:
-          $ref: '#/components/schemas/ThemeA19Enum'
-    PreferredLanguageF0bEnum:
+          $ref: '#/components/schemas/ThemeEnum'
+    PreferredLanguageEnum:
       enum:
       - en
       - sw
       type: string
       description: |-
-        * `en` - en
-        * `sw` - sw
+        * `en` - English
+        * `sw` - Swahili
     Product:
       type: object
       description: |-
@@ -3420,9 +3806,10 @@ components:
 
         - `image` main image
         - `image_url` absolute URL
-        - flatten seller info
-        - distance_km from haversine
+        - seller: SellerProfileSerializer (ina rating, total_sales, location, distance)
+        - distance_km from haversine (source="distance" attribute on queryset)
         - likes_count & is_liked
+        - sales_count & units_sold (per product)
       properties:
         id:
           type: integer
@@ -3496,6 +3883,12 @@ components:
         is_liked:
           type: boolean
           readOnly: true
+        sales_count:
+          type: integer
+          readOnly: true
+        units_sold:
+          type: integer
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -3521,9 +3914,11 @@ components:
       - longitude
       - name
       - price
+      - sales_count
       - seller
       - seller_id
       - shop_name
+      - units_sold
       - updated_at
     ProductCreate:
       type: object
@@ -3677,6 +4072,63 @@ components:
           type: integer
       required:
       - product
+    ProductMini:
+      type: object
+      description: Product mdogo kwa chat header / notification payload.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        image_url:
+          type: string
+          nullable: true
+          readOnly: true
+        likes_count:
+          type: integer
+          readOnly: true
+        sales_count:
+          type: integer
+          readOnly: true
+        units_sold:
+          type: integer
+          readOnly: true
+      required:
+      - id
+      - image_url
+      - likes_count
+      - name
+      - price
+      - sales_count
+      - units_sold
+    ProductMiniRequest:
+      type: object
+      description: Product mdogo kwa chat header / notification payload.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+      required:
+      - name
+      - price
     ProductRequest:
       type: object
       description: |-
@@ -3684,9 +4136,10 @@ components:
 
         - `image` main image
         - `image_url` absolute URL
-        - flatten seller info
-        - distance_km from haversine
+        - seller: SellerProfileSerializer (ina rating, total_sales, location, distance)
+        - distance_km from haversine (source="distance" attribute on queryset)
         - likes_count & is_liked
+        - sales_count & units_sold (per product)
       properties:
         name:
           type: string
@@ -3770,9 +4223,74 @@ components:
       required:
       - rating
       - seller
+    SellerMini:
+      type: object
+      description: Seller kwa matumizi ya ndani ya product / conversation headers.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        business_name:
+          type: string
+          maxLength: 255
+        is_verified:
+          type: boolean
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        rating_count:
+          type: integer
+        total_sales:
+          type: integer
+        items_sold:
+          type: integer
+        logo_url:
+          type: string
+          nullable: true
+          readOnly: true
+        user:
+          allOf:
+          - $ref: '#/components/schemas/UserMini'
+          readOnly: true
+      required:
+      - business_name
+      - id
+      - logo_url
+      - user
+    SellerMiniRequest:
+      type: object
+      description: Seller kwa matumizi ya ndani ya product / conversation headers.
+      properties:
+        business_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        is_verified:
+          type: boolean
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        rating_count:
+          type: integer
+        total_sales:
+          type: integer
+        items_sold:
+          type: integer
+      required:
+      - business_name
     SellerProfile:
       type: object
-      description: Serializer for SellerProfile model
+      description: |-
+        Full SellerProfile:
+
+        - user: full UserSerializer (ina profile info)
+        - location: LocationSerializer (ina distance kama umehesabiwa)
+        - logo_url: absolute URL
+        - rating, rating_count
+        - total_sales, items_sold
+        - distance: kwa seller (ikiwekwa na haversine kwenye view)
       properties:
         id:
           type: integer
@@ -3796,8 +4314,22 @@ components:
           format: decimal
           pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
           readOnly: true
+        rating_count:
+          type: integer
+          readOnly: true
         total_sales:
           type: integer
+          readOnly: true
+        items_sold:
+          type: integer
+          readOnly: true
+        logo:
+          type: string
+          format: uri
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
           readOnly: true
         location:
           allOf:
@@ -3821,8 +4353,11 @@ components:
       - created_at
       - distance
       - id
+      - items_sold
       - location
+      - logo_url
       - rating
+      - rating_count
       - total_sales
       - updated_at
       - user
@@ -3838,6 +4373,10 @@ components:
         phone_number:
           type: string
           maxLength: 20
+        logo:
+          type: string
+          format: uri
+          nullable: true
         location:
           $ref: '#/components/schemas/Location'
       required:
@@ -3856,6 +4395,10 @@ components:
         phone_number:
           type: string
           maxLength: 20
+        logo:
+          type: string
+          format: binary
+          nullable: true
         location:
           $ref: '#/components/schemas/LocationRequest'
       required:
@@ -3863,7 +4406,15 @@ components:
       - location
     SellerProfileRequest:
       type: object
-      description: Serializer for SellerProfile model
+      description: |-
+        Full SellerProfile:
+
+        - user: full UserSerializer (ina profile info)
+        - location: LocationSerializer (ina distance kama umehesabiwa)
+        - logo_url: absolute URL
+        - rating, rating_count
+        - total_sales, items_sold
+        - distance: kwa seller (ikiwekwa na haversine kwenye view)
       properties:
         business_name:
           type: string
@@ -3876,6 +4427,10 @@ components:
           maxLength: 20
         is_verified:
           type: boolean
+        logo:
+          type: string
+          format: binary
+          nullable: true
       required:
       - business_name
     SimpleMessage:
@@ -3886,30 +4441,16 @@ components:
           type: string
       required:
       - message
-    StatusEnum:
-      enum:
-      - pending
-      - accepted
-      - rejected
-      - cancelled
-      - completed
-      type: string
-      description: |-
-        * `pending` - Pending
-        * `accepted` - Accepted
-        * `rejected` - Rejected
-        * `cancelled` - Cancelled
-        * `completed` - Completed
-    ThemeA19Enum:
+    ThemeEnum:
       enum:
       - light
       - dark
       - system
       type: string
       description: |-
-        * `light` - light
-        * `dark` - dark
-        * `system` - system
+        * `light` - Light
+        * `dark` - Dark
+        * `system` - System
     TokenObtainPair:
       type: object
       properties:
@@ -4003,12 +4544,77 @@ components:
           type: string
           nullable: true
           readOnly: true
+        avatar_url:
+          type: string
+          nullable: true
+          readOnly: true
       required:
+      - avatar_url
       - date_joined
       - id
       - is_seller
       - preferred_language
       - theme
+      - username
+    UserMini:
+      type: object
+      description: User mdogo kwa ajili ya chat, seller info, n.k.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        avatar_url:
+          type: string
+          nullable: true
+          readOnly: true
+        is_seller:
+          type: boolean
+          readOnly: true
+      required:
+      - avatar_url
+      - id
+      - is_seller
+      - username
+    UserMiniRequest:
+      type: object
+      description: User mdogo kwa ajili ya chat, seller info, n.k.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+      required:
       - username
     UserProfile:
       type: object
@@ -4017,17 +4623,22 @@ components:
         - is_seller: kama ni muuzaji au mnunuaji
         - preferred_language: 'en' / 'sw'
         - theme: 'light' / 'dark' / 'system'
+        - avatar: profile picture
       properties:
         is_seller:
           type: boolean
         preferred_language:
-          $ref: '#/components/schemas/UserProfilePreferredLanguageEnum'
+          $ref: '#/components/schemas/PreferredLanguageEnum'
         theme:
-          $ref: '#/components/schemas/UserProfileThemeEnum'
+          $ref: '#/components/schemas/ThemeEnum'
         avatar:
           type: string
           format: uri
           nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -4037,26 +4648,9 @@ components:
           format: date-time
           readOnly: true
       required:
+      - avatar_url
       - created_at
       - updated_at
-    UserProfilePreferredLanguageEnum:
-      enum:
-      - en
-      - sw
-      type: string
-      description: |-
-        * `en` - English
-        * `sw` - Swahili
-    UserProfileThemeEnum:
-      enum:
-      - light
-      - dark
-      - system
-      type: string
-      description: |-
-        * `light` - Light
-        * `dark` - Dark
-        * `system` - System
     UserRegistrationRequest:
       type: object
       description: |-
@@ -4099,12 +4693,12 @@ components:
           default: false
         preferred_language:
           allOf:
-          - $ref: '#/components/schemas/PreferredLanguageF0bEnum'
+          - $ref: '#/components/schemas/PreferredLanguageEnum'
           writeOnly: true
           default: en
         theme:
           allOf:
-          - $ref: '#/components/schemas/ThemeA19Enum'
+          - $ref: '#/components/schemas/ThemeEnum'
           writeOnly: true
           default: system
       required:
@@ -4144,9 +4738,9 @@ components:
         last_name:
           type: string
         preferred_language:
-          $ref: '#/components/schemas/PreferredLanguageF0bEnum'
+          $ref: '#/components/schemas/PreferredLanguageEnum'
         theme:
-          $ref: '#/components/schemas/ThemeA19Enum'
+          $ref: '#/components/schemas/ThemeEnum'
   securitySchemes:
     jwtAuth:
       type: http

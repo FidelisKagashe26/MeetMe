@@ -6,6 +6,8 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     """
     Calculate the great circle distance between two points on the earth
     (specified in decimal degrees). Returns distance in kilometers (float).
+
+    Hii ndiyo core formula tunayotumia kila sehemu.
     """
     # Convert decimal degrees to radians
     lat1, lon1, lat2, lon2 = map(
@@ -30,7 +32,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 def calculate_distance_km(point1_lat, point1_lon, point2_lat, point2_lon):
     """
-    Wrapper function to calculate distance and return as Decimal (km, rounded 2 d.p.)
+    Wrapper function to calculate distance and return as Decimal (km, 2 d.p.)
     """
     distance = haversine_distance(point1_lat, point1_lon, point2_lat, point2_lon)
     return Decimal(str(round(distance, 2)))
@@ -38,7 +40,7 @@ def calculate_distance_km(point1_lat, point1_lon, point2_lat, point2_lon):
 
 def calculate_distance_km_and_miles(point1_lat, point1_lon, point2_lat, point2_lon):
     """
-    Helper: return both km and miles as (Decimal km, Decimal miles)
+    Helper: return both km and miles as (Decimal km, Decimal miles), 2 d.p.
     """
     km = calculate_distance_km(point1_lat, point1_lon, point2_lat, point2_lon)
     miles = km * Decimal("0.621371")
@@ -53,12 +55,13 @@ def filter_by_radius(queryset, user_lat, user_lon, radius_km):
       - obj.location.latitude / obj.location.longitude
       - obj.latitude / obj.longitude
 
-    Returns a Python list, kila object akiwa na attribute `distance` (Decimal, km).
+    Returns a Python list, kila object akiwa na attribute:
+      - obj.distance (Decimal, km, 2 d.p.)
     """
     results = []
 
     for obj in queryset:
-        if hasattr(obj, "location") and obj.location:
+        if hasattr(obj, "location") and getattr(obj, "location") is not None:
             lat = float(obj.location.latitude)
             lon = float(obj.location.longitude)
         elif hasattr(obj, "latitude") and hasattr(obj, "longitude"):
@@ -81,12 +84,13 @@ def add_distance_to_queryset(queryset, user_lat, user_lon):
     """
     Add distance attribute to each object in queryset (km) bila ku-filter radius.
 
-    Returns Python list, kila object akiwa na `distance` (Decimal, km).
+    Returns Python list, kila object akiwa na:
+      - obj.distance (Decimal, km, 2 d.p.)
     """
     results = []
 
     for obj in queryset:
-        if hasattr(obj, "location") and obj.location:
+        if hasattr(obj, "location") and getattr(obj, "location") is not None:
             lat = float(obj.location.latitude)
             lon = float(obj.location.longitude)
         elif hasattr(obj, "latitude") and hasattr(obj, "longitude"):
@@ -105,7 +109,10 @@ def add_distance_to_queryset(queryset, user_lat, user_lon):
 def sort_by_distance(items):
     """
     Sort items by .distance attribute (ascending).
-    Items wanaotokuwa na distance watakuja mwisho.
+    Items wasiokuwa na distance watakuja mwisho.
+
+    Inatarajia kila item aidha awe na:
+      - item.distance (Decimal/float)
     """
     return sorted(
         items,

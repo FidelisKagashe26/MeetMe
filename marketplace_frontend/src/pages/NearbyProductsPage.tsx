@@ -1,8 +1,7 @@
 // src/pages/NearbyProductsPage.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import apiClient from "../lib/apiClient";
-// import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
@@ -36,57 +35,77 @@ interface PaginatedProductList {
   results: Product[];
 }
 
+// backend anaweza kurudisha list tu au paginated
 type NearbyResponse = Product[] | PaginatedProductList;
 
-interface NearbySearchPayload {
-  latitude: string;
-  longitude: string;
-  radius: number;
-  sort_by: "distance" | "price" | "rating";
-  category?: string;
-  min_price?: string;
-  max_price?: string;
+// query params kwa /api/products/nearby/
+interface NearbyQueryParams {
+  lat: number;
+  lng: number;
+  radius?: number;
+  limit?: number;
+  // location?: string; // kama utataka baadaye
 }
 
 const NearbyProductsPage: React.FC = () => {
-  // const { user } = useAuth();
-
-  const [latitude, setLatitude] = useState<string>("");
-  const [longitude, setLongitude] = useState<string>("");
-  const [radius, setRadius] = useState<string>("10");
-  const [category, setCategory] = useState<string>("");
-  const [minPrice, setMinPrice] = useState<string>("");
-  const [maxPrice, setMaxPrice] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"distance" | "price" | "rating">(
-    "distance"
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null
   );
+  const [radius, setRadius] = useState<number>(10); // km
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ====== GET BROWSER LOCATION ======
+  const askLocation = () => {
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Browser wako hauna support ya geolocation.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setCoords({ lat: latitude, lng: longitude });
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationError(
+            "Umezima ruhusa ya location. Fungua settings za browser kuruhusu location kwa LINKA."
+          );
+        } else {
+          setLocationError("Imeshindikana kupata location ya kifaa.");
+        }
+      }
+    );
+  };
+
+  // mara ya kwanza kabisa, jaribu kuchukua location
+  useEffect(() => {
+    askLocation();
+  }, []);
+
+  // ====== FETCH NEARBY PRODUCTS ======
+  const fetchNearby = async (params: NearbyQueryParams) => {
     setLoading(true);
     setError(null);
     setProducts([]);
 
-    const payload: NearbySearchPayload = {
-      latitude,
-      longitude,
-      radius: radius ? parseInt(radius, 10) : 10,
-      sort_by: sortBy,
-    };
-
-    if (category.trim()) payload.category = category.trim();
-    if (minPrice.trim()) payload.min_price = minPrice.trim();
-    if (maxPrice.trim()) payload.max_price = maxPrice.trim();
-
     try {
-      const res = await apiClient.post<NearbyResponse>(
-        "/api/products/search_nearby/",
-        payload
-      );
+      const res = await apiClient.get<NearbyResponse>("/api/products/nearby/", {
+        params: {
+          lat: params.lat,
+          lng: params.lng,
+          radius: params.radius ?? radius,
+          limit: params.limit ?? 30,
+        },
+      });
 
       let dataProducts: Product[] = [];
 
@@ -105,29 +124,34 @@ const NearbyProductsPage: React.FC = () => {
         if (data && typeof data === "object") {
           setError(JSON.stringify(data));
         } else {
-          setError("Failed to search nearby products.");
+          setError("Imeshindikana kutafuta bidhaa karibu.");
         }
       } else {
-        setError("Failed to search nearby products.");
+        setError("Imeshindikana kutafuta bidhaa karibu.");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // if (!user) {
-  //   return (
-  //     <div className="min-h-screen flex flex-col bg-slate-50">
-  //       <MainHeader />
-  //       <main className="flex-1 flex items-center justify-center px-4">
-  //         <div className="bg-white rounded-lg shadow p-4 text-sm">
-  //           You must be logged in to search nearby products.
-  //         </div>
-  //       </main>
-  //       <MainFooter />
-  //     </div>
-  //   );
-  // }
+  // kila tukipata coords mpya → tafuta karibu
+  useEffect(() => {
+    if (coords) {
+      void fetchNearby({ lat: coords.lat, lng: coords.lng });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords, radius]);
+
+  // filter ndogo ya client-side kwa search box
+  const filteredProducts = products.filter((p) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(term) ||
+      p.description.toLowerCase().includes(term) ||
+      (p.seller?.business_name || "").toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -138,142 +162,98 @@ const NearbyProductsPage: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-xl font-semibold mb-1">
-              Search Nearby Products
+              Bidhaa karibu na ulipo
             </h2>
             <p className="text-xs text-slate-600">
-              Weka location (latitude &amp; longitude) ya user, radius na
-              optional filters kisha system itarudisha bidhaa zilizo karibu.
+              Tunatumia location ya kifaa chako (GPS / browser) kuonyesha bidhaa
+              za karibu.
             </p>
           </div>
           <Link
             to="/products"
             className="text-[11px] text-orange-600 hover:underline"
           >
-            ← Back to products
+            ← Rudi kwenye bidhaa zote
           </Link>
         </div>
 
-        {/* FORM */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-lg shadow p-4 mb-6 space-y-4"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs mb-1">Latitude *</label>
-              <input
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="-6.1630"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs mb-1">Longitude *</label>
-              <input
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="35.7516"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs mb-1">
-                Radius (km) <span className="text-slate-400">(default 10)</span>
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={radius}
-                onChange={(e) => setRadius(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs mb-1">
-                Category <span className="text-slate-400">(optional)</span>
-              </label>
-              <input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="e.g. Laptops"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mb-1">
-                Min price <span className="text-slate-400">(optional)</span>
-              </label>
-              <input
-                value={minPrice}
-                onChange={(e) => setMinPrice(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="100000"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mb-1">
-                Max price <span className="text-slate-400">(optional)</span>
-              </label>
-              <input
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="2000000"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div>
-              <label className="block text-xs mb-1">Sort by</label>
-              <select
-                value={sortBy}
-                onChange={(e) =>
-                  setSortBy(e.target.value as "distance" | "price" | "rating")
-                }
-                className="border rounded px-3 py-2 text-sm"
+        {/* LOCATION & FILTER BAR */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6 space-y-3">
+          <div className="flex flex-wrap items-center gap-3 justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={askLocation}
+                className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-medium hover:bg-black"
               >
-                <option value="distance">Distance</option>
-                <option value="price">Price</option>
-                <option value="rating">Seller rating</option>
-              </select>
+                Tumia location yangu
+              </button>
+
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                <label htmlFor="radius" className="whitespace-nowrap">
+                  Radius:
+                </label>
+                <select
+                  id="radius"
+                  value={radius}
+                  onChange={(e) => setRadius(parseInt(e.target.value, 10))}
+                  className="border rounded px-2 py-1 text-[11px]"
+                >
+                  <option value={5}>5 km</option>
+                  <option value={10}>10 km</option>
+                  <option value={20}>20 km</option>
+                  <option value={50}>50 km</option>
+                </select>
+              </div>
+
+              {coords && (
+                <div className="text-[11px] text-slate-400">
+                  Lat: {coords.lat.toFixed(4)}, Lng: {coords.lng.toFixed(4)}
+                </div>
+              )}
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-60"
-            >
-              {loading ? "Searching..." : "Search nearby"}
-            </button>
+            <div className="w-full sm:w-64">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tafuta ndani ya matokeo (jina la bidhaa / duka)..."
+                className="w-full border rounded-full px-3 py-1.5 text-[11px]"
+              />
+            </div>
           </div>
+
+          {locationError && (
+            <div className="text-[11px] text-red-600 bg-red-50 px-3 py-2 rounded">
+              {locationError}
+            </div>
+          )}
 
           {error && (
-            <div className="mt-3 text-xs text-red-600 bg-red-50 p-2 rounded">
+            <div className="text-[11px] text-red-600 bg-red-50 px-3 py-2 rounded">
               {error}
             </div>
           )}
-        </form>
+        </div>
 
         {/* RESULTS */}
         <div>
-          {loading && <div className="text-xs">Loading results...</div>}
+          {loading && (
+            <div className="text-xs text-slate-500 mb-2">
+              Inatafuta bidhaa karibu na ulipo...
+            </div>
+          )}
 
-          {!loading && products.length === 0 && !error && (
+          {!loading && filteredProducts.length === 0 && !error && (
             <div className="text-xs text-slate-500">
-              Hakuna matokeo bado, jaribu kutafuta.
+              Hakuna matokeo bado. Hakikisha location imewashwa kisha jaribu
+              tena.
             </div>
           )}
 
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {products.map((product) => {
+            {filteredProducts.map((product) => {
               const distanceValue =
                 product.distance_km ?? product.distance ?? null;
               const sellerId = product.seller?.id;

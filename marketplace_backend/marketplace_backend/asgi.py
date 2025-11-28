@@ -1,11 +1,21 @@
-"""
-ASGI config for marketplace_backend project.
-"""
+# marketplace_backend/asgi.py
 
 import os
-
 from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'marketplace_backend.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "marketplace_backend.settings")
 
-application = get_asgi_application()
+django_asgi_app = get_asgi_application()
+
+from marketplace_backend.channels_jwt_middleware import JWTAuthMiddleware
+import api.routing
+
+application = ProtocolTypeRouter(
+    {
+        "http": django_asgi_app,
+        "websocket": JWTAuthMiddleware(
+            URLRouter(api.routing.websocket_urlpatterns)
+        ),
+    }
+)

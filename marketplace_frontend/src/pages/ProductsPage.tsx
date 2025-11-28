@@ -1,5 +1,5 @@
 // src/pages/ProductsPage.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import apiClient from "../lib/apiClient";
 import MainHeader from "../components/MainHeader";
@@ -38,7 +38,7 @@ interface Product {
   // gallery from backend
   images?: ProductImage[];
 
-  // likes info from backend (optional, kulingana na serializer yako)
+  // likes info from backend
   likes_count?: number;
   is_liked_by_me?: boolean;
   is_liked?: boolean;
@@ -54,6 +54,10 @@ interface PaginatedProductList {
 interface Coords {
   lat: number;
   lng: number;
+}
+
+interface ConversationCreateResponse {
+  id: number;
 }
 
 const ProductsPage: React.FC = () => {
@@ -91,7 +95,10 @@ const ProductsPage: React.FC = () => {
   // Likes loading state kwa kila product
   const [likeLoading, setLikeLoading] = useState<Record<number, boolean>>({});
 
-  const fetchProducts = async () => {
+  // Chat loading state kwa kila product
+  const [chatLoading, setChatLoading] = useState<Record<number, boolean>>({});
+
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -109,6 +116,7 @@ const ProductsPage: React.FC = () => {
 
       let url: string;
 
+      // Kama tuna coordinates, tumia /products/nearby/
       if (activeCoords) {
         params.set("lat", String(activeCoords.lat));
         params.set("lng", String(activeCoords.lng));
@@ -126,12 +134,11 @@ const ProductsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCoords, activeLocation, activeQuery, page]);
 
   useEffect(() => {
     void fetchProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, activeQuery, activeLocation, activeCoords]);
+  }, [fetchProducts]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,7 +195,6 @@ const ProductsPage: React.FC = () => {
 
   // ==== KUCHAGUA PICHA KUU YA PRODUCT ====
   const getMainImage = (product: Product): string | null => {
-    // Chukua primary image kama ipo, vinginevyo ya kwanza tu
     const primary =
       product.images?.find((img) => img.is_primary) ?? product.images?.[0];
 
@@ -212,34 +218,62 @@ const ProductsPage: React.FC = () => {
     setLikeLoading((prev) => ({ ...prev, [productId]: true }));
 
     try {
-      // ProductLikeRequest inawezekana inaitwa { product: number }
       await apiClient.post("/api/product-likes/toggle/", {
-        product: productId,
+        product_id: productId,
       });
 
-      // refresh list ili likes_count & is_liked_by_me vijae kutoka backend
+      // Refresh list ili likes_count & is_liked_by_me vijae kutoka backend
       await fetchProducts();
     } catch (err) {
-      console.error(err);
-      // unaweza kuweka toast / error hapa baadaye
+      console.error("Failed to toggle like", err);
+      // TODO: unaweza kuongeza toast ya error hapo baadaye
     } finally {
       setLikeLoading((prev) => ({ ...prev, [productId]: false }));
     }
   };
 
-  // ==== OPEN CHAT FOR PRODUCT / SELLER ====
-  const handleOpenChat = (productId: number, sellerId?: number) => {
+  // ==== OPEN / CREATE CONVERSATION FOR PRODUCT / SELLER ====
+  const handleOpenChat = async (productId: number, sellerId?: number) => {
     if (!user) {
       const next = `${location.pathname}${location.search}`;
       navigate(`/login?next=${encodeURIComponent(next)}`);
       return;
     }
 
-    const params = new URLSearchParams();
-    params.set("product", String(productId));
-    if (sellerId) params.set("seller", String(sellerId));
+    if (!sellerId) {
+      // Kama hatuna sellerId, mpeleke kwenye product details tu
+      navigate(`/products/${productId}`);
+      return;
+    }
 
-    navigate(`/chat?${params.toString()}`);
+    setChatLoading((prev) => ({ ...prev, [productId]: true }));
+
+    try {
+      const res = await apiClient.post<ConversationCreateResponse>(
+        "/api/conversations/",
+        {
+          seller_id: sellerId,
+          product_id: productId,
+        }
+      );
+
+      const conversationId = res.data.id;
+
+      const params = new URLSearchParams();
+      params.set("conversation", String(conversationId));
+      params.set("product", String(productId));
+      params.set("seller", String(sellerId));
+
+      navigate(`/chat?${params.toString()}`);
+    } catch (err) {
+      console.error("Failed to open conversation", err);
+      const params = new URLSearchParams();
+      params.set("product", String(productId));
+      if (sellerId) params.set("seller", String(sellerId));
+      navigate(`/chat?${params.toString()}`);
+    } finally {
+      setChatLoading((prev) => ({ ...prev, [productId]: false }));
+    }
   };
 
   return (
@@ -474,6 +508,7 @@ const ProductsPage: React.FC = () => {
                 product.is_liked_by_me ?? product.is_liked ?? false;
               const likesCount = product.likes_count ?? 0;
               const isLikeBusy = likeLoading[product.id] || false;
+              const isChatBusy = chatLoading[product.id] || false;
 
               return (
                 <article
@@ -566,11 +601,12 @@ const ProductsPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() =>
-                            handleOpenChat(product.id, sellerId)
+                            void handleOpenChat(product.id, sellerId)
                           }
-                          className="px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          disabled={isChatBusy}
+                          className="px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                         >
-                          Chat
+                          {isChatBusy ? "Opening..." : "Chat"}
                         </button>
                       </div>
 

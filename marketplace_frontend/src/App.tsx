@@ -19,6 +19,7 @@ import ChangePasswordPage from "./pages/ChangePasswordPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import SellersPage from "./pages/SellersPage";
 import ChatPage from "./pages/ChatPage";
+import OrderDetailPage from "./pages/OrderDetailPage";
 
 const App: React.FC = () => {
   return (
@@ -42,6 +43,7 @@ const App: React.FC = () => {
         <Route path="/seller-profile" element={<SellerProfilePage />} />
         <Route path="/orders/new" element={<OrderCreatePage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/orders/:id" element={<OrderDetailPage />} />
 
         {/* Akaunti & notifications */}
         <Route path="/account/profile" element={<AccountProfilePage />} />

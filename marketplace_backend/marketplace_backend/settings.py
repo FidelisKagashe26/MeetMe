@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_spectacular',
+    'channels',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'api',
@@ -82,7 +83,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'marketplace_backend.wsgi.application'
-
+ASGI_APPLICATION = 'marketplace_backend.asgi.application'
 
 # Database
 # Using Postgresql as default
@@ -183,3 +184,11 @@ MAPBOX_ACCESS_TOKEN = env('MAPBOX_ACCESS_TOKEN', default='')
 
 # Custom User Model (optional - using default for now)
 # AUTH_USER_MODEL = 'api.CustomUser'
+
+# ====== CHANNEL LAYERS (WebSocket) ======
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        # kwa production tutaweka channels_redis hapa
+    }
+}

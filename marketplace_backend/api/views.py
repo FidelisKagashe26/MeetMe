@@ -3,7 +3,9 @@ from decimal import Decimal
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Q
+from django.utils import timezone
+
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ValidationError
@@ -13,6 +15,9 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from .models import (
     UserProfile,
@@ -26,6 +31,7 @@ from .models import (
     Favorite,
     Order,
     Conversation,
+    ConversationParticipantState,
     Message,
     Notification,
 )
@@ -50,9 +56,11 @@ from .serializers import (
     DistanceRequestSerializer,
     DistanceResponseSerializer,
     ProductLikeSerializer,
+    ProductLikeToggleSerializer,
     OrderSerializer,
     OrderCreateSerializer,
     ConversationSerializer,
+    ConversationDetailSerializer,
     MessageSerializer,
     MessageCreateSerializer,
     NotificationSerializer,
@@ -104,7 +112,7 @@ def register_user(request):
             {
                 "access": tokens["access"],
                 "refresh": tokens["refresh"],
-                "user": UserSerializer(user).data,
+                "user": UserSerializer(user, context={"request": request}).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -156,7 +164,7 @@ def login_user(request):
             {
                 "access": tokens["access"],
                 "refresh": tokens["refresh"],
-                "user": UserSerializer(user).data,
+                "user": UserSerializer(user, context={"request": request}).data,
             }
         )
 
@@ -237,10 +245,10 @@ def me(request):
             profile.theme = data["theme"]
         profile.save()
 
-        return Response(UserSerializer(user).data)
+        return Response(UserSerializer(user, context={"request": request}).data)
 
     # GET
-    return Response(UserSerializer(user).data)
+    return Response(UserSerializer(user, context={"request": request}).data)
 
 
 @extend_schema(
@@ -313,7 +321,7 @@ def update_user_settings(request):
             profile.theme = data["theme"]
         profile.save()
 
-    out = UserProfileSerializer(profile)
+    out = UserProfileSerializer(profile, context={"request": request})
     return Response(out.data)
 
 
@@ -336,7 +344,7 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
         return SellerProfileSerializer
 
     def get_permissions(self):
-        if self.action in ["create", "update", "partial_update", "destroy"]:
+        if self.action in ["create", "update", "partial_update", "destroy", "me"]:
             return [IsAuthenticated()]
         return [AllowAny()]
 
@@ -356,7 +364,7 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
 
         try:
             seller = request.user.seller_profile
-            serializer = SellerProfileSerializer(seller)
+            serializer = SellerProfileSerializer(seller, context={"request": request})
             return Response(serializer.data)
         except SellerProfile.DoesNotExist:
             return Response(
@@ -407,7 +415,11 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
         Get all products for a specific seller
         """
         seller = self.get_object()
-        products = Product.objects.filter(seller=seller, is_active=True)
+        products = Product.objects.filter(seller=seller, is_active=True).select_related(
+            "seller",
+            "seller__location",
+            "category",
+        ).prefetch_related("images", "likes")
         serializer = ProductSerializer(products, many=True, context={"request": request})
         return Response(serializer.data)
 
@@ -418,7 +430,7 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
         """
         seller = self.get_object()
         reviews = Review.objects.filter(seller=seller)
-        serializer = ReviewSerializer(reviews, many=True)
+        serializer = ReviewSerializer(reviews, many=True, context={"request": request})
         return Response(serializer.data)
 
 
@@ -671,14 +683,17 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         review = serializer.save(user=self.request.user)
+        # Update seller rating & rating_count
+        review.seller.recalculate_rating()
 
-        # Update seller rating
-        seller = review.seller
-        avg_rating = Review.objects.filter(seller=seller).aggregate(Avg("rating"))[
-            "rating__avg"
-        ]
-        seller.rating = round(avg_rating, 2) if avg_rating else 0
-        seller.save()
+    def perform_update(self, serializer):
+        review = serializer.save()
+        review.seller.recalculate_rating()
+
+    def perform_destroy(self, instance):
+        seller = instance.seller
+        super().perform_destroy(instance)
+        seller.recalculate_rating()
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -696,7 +711,7 @@ class FavoriteViewSet(viewsets.ModelViewSet):
     """
     ViewSet for user favorites (sellers)
     """
-    queryset = Favorite.objects.select_related("user", "seller").all()
+    queryset = Favorite.objects.select_related("user", "seller", "seller__location")
     serializer_class = FavoriteSerializer
     permission_classes = [IsAuthenticated]
 
@@ -744,7 +759,10 @@ class FavoriteViewSet(viewsets.ModelViewSet):
             {
                 "message": "Added to favorites",
                 "is_favorite": True,
-                "favorite": FavoriteSerializer(favorite).data,
+                "favorite": FavoriteSerializer(
+                    favorite,
+                    context={"request": request},
+                ).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -782,13 +800,17 @@ class ProductLikeViewSet(viewsets.ModelViewSet):
     def toggle(self, request):
         """
         Toggle like/unlike for a product
+
+        Body:
+        {
+          "product_id": 123
+        }
         """
-        product_id = request.data.get("product_id")
-        if not product_id:
-            return Response(
-                {"error": "product_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        toggle_serializer = ProductLikeToggleSerializer(data=request.data)
+        if not toggle_serializer.is_valid():
+            return Response(toggle_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        product_id = toggle_serializer.validated_data["product_id"]
 
         try:
             product = Product.objects.get(id=product_id)
@@ -821,6 +843,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.select_related(
         "buyer",
         "seller",
+        "seller__user",
         "product",
         "product__seller",
     )
@@ -870,11 +893,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             total_price=total_price,
         )
 
-        # update total_sales
-        SellerProfile.objects.filter(pk=product.seller.pk).update(
-            total_sales=models.F("total_sales") + 1
-        )
-
         # notifications
         Notification.objects.create(
             user=product.seller.user,
@@ -892,6 +910,25 @@ class OrderViewSet(viewsets.ModelViewSet):
             data={"order_id": order.id, "product_id": product.id},
         )
 
+    def perform_update(self, serializer):
+        """
+        Update order and keep seller.sales stats in sync (completed orders only).
+        """
+        order = serializer.instance
+        old_status = order.status
+        order = serializer.save()
+
+        # kama kabla au baada ya update order iko COMPLETED, recompute mauzo
+        if old_status == Order.STATUS_COMPLETED or order.status == Order.STATUS_COMPLETED:
+            order.seller.recalculate_sales()
+
+    def perform_destroy(self, instance):
+        was_completed = instance.status == Order.STATUS_COMPLETED
+        seller = instance.seller
+        super().perform_destroy(instance)
+        if was_completed:
+            seller.recalculate_sales()
+
     @action(detail=False, methods=["get"])
     def as_buyer(self, request):
         """
@@ -900,9 +937,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         qs = self.queryset.filter(buyer=request.user)
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = OrderSerializer(page, many=True)
+            serializer = OrderSerializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
-        serializer = OrderSerializer(qs, many=True)
+        serializer = OrderSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
@@ -918,9 +955,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         qs = self.queryset.filter(seller=seller_profile)
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = OrderSerializer(page, many=True)
+            serializer = OrderSerializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
-        serializer = OrderSerializer(qs, many=True)
+        serializer = OrderSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
 
@@ -938,10 +975,15 @@ class ConversationViewSet(viewsets.ModelViewSet):
         "seller__user",
         "product",
     )
-    serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.OrderingFilter]
-    ordering_fields = ["updated_at", "created_at"]
+    ordering_fields = ["last_message_at", "created_at"]
+    ordering = ["-last_message_at"]
+
+    def get_serializer_class(self):
+        if self.action in ["retrieve", "create"]:
+            return ConversationDetailSerializer
+        return ConversationSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -949,16 +991,148 @@ class ConversationViewSet(viewsets.ModelViewSet):
             Q(buyer=user) | Q(seller__user=user)
         ).distinct()
 
-    def perform_create(self, serializer):
-        buyer = self.request.user
-        seller = serializer.validated_data.get("seller")
+    def create(self, request, *args, **kwargs):
+        """
+        Create or reuse conversation between current user (buyer) and seller.
 
-        if seller.user_id == buyer.id:
-            raise ValidationError(
-                {"detail": "You cannot start a conversation with yourself."}
+        Body:
+        {
+          "seller_id": 1,
+          "product_id": 10  # optional
+        }
+        """
+        user = request.user
+        seller_id = request.data.get("seller_id")
+        product_id = request.data.get("product_id")
+
+        if not seller_id:
+            return Response(
+                {"error": "seller_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer.save(buyer=buyer)
+        try:
+            seller = SellerProfile.objects.get(pk=seller_id)
+        except SellerProfile.DoesNotExist:
+            return Response(
+                {"error": "Seller not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if seller.user_id == user.id:
+            return Response(
+                {"error": "You cannot start a conversation with yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        product = None
+        if product_id:
+            try:
+                product = Product.objects.get(pk=product_id)
+            except Product.DoesNotExist:
+                return Response(
+                    {"error": "Product not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if product.seller_id != seller.id:
+                return Response(
+                    {"error": "Product does not belong to this seller."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        conversation, created = Conversation.objects.get_or_create(
+            buyer=user,
+            seller=seller,
+            product=product,
+        )
+
+        # ensure participant states for both participants
+        ConversationParticipantState.objects.get_or_create(
+            conversation=conversation,
+            user=user,
+        )
+        ConversationParticipantState.objects.get_or_create(
+            conversation=conversation,
+            user=seller.user,
+        )
+
+        serializer = self.get_serializer(conversation, context={"request": request})
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"])
+    def mark_seen(self, request, pk=None):
+        """
+        Tandika messages zote (za upande mwingine) kama zimesomwa
+        na update participant_state (last_seen_at, last_read_at).
+        """
+        conversation = self.get_object()
+        user = request.user
+
+        if not (
+            conversation.buyer_id == user.id
+            or conversation.seller.user_id == user.id
+        ):
+            return Response(
+                {"detail": "You are not part of this conversation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # mark all messages from other side as read
+        count = conversation.messages.filter(
+            is_read=False
+        ).exclude(sender=user).update(
+            is_read=True,
+            status=Message.STATUS_READ,
+        )
+
+        # update participant state
+        state, _ = ConversationParticipantState.objects.get_or_create(
+            conversation=conversation,
+            user=user,
+        )
+        now = timezone.now()
+        state.last_seen_at = now
+        state.last_read_at = now
+        state.is_typing = False
+        state.save(update_fields=["last_seen_at", "last_read_at", "is_typing"])
+
+        return Response({"marked_read": count})
+
+    @action(detail=True, methods=["post"])
+    def typing(self, request, pk=None):
+        """
+        Update typing state kwa current user kwenye conversation hii.
+
+        Body:
+        {
+          "is_typing": true/false
+        }
+        """
+        conversation = self.get_object()
+        user = request.user
+
+        if not (
+            conversation.buyer_id == user.id
+            or conversation.seller.user_id == user.id
+        ):
+            return Response(
+                {"detail": "You are not part of this conversation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        is_typing = bool(request.data.get("is_typing", True))
+        state, _ = ConversationParticipantState.objects.get_or_create(
+            conversation=conversation,
+            user=user,
+        )
+        state.is_typing = is_typing
+        state.last_typing_at = timezone.now()
+        state.save(update_fields=["is_typing", "last_typing_at"])
+
+        return Response({"is_typing": is_typing})
 
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -991,6 +1165,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         user = self.request.user
         conversation = serializer.validated_data.get("conversation")
 
+        # hakikisha user ni sehemu ya hiyo conversation
         if not (
             conversation.buyer_id == user.id
             or conversation.seller.user_id == user.id
@@ -999,12 +1174,24 @@ class MessageViewSet(viewsets.ModelViewSet):
                 {"detail": "You are not part of this conversation."}
             )
 
+        # hifadhi message
         msg = serializer.save(sender=user)
 
         # update last_message_at
         Conversation.objects.filter(pk=conversation.pk).update(
             last_message_at=msg.created_at
         )
+
+        # update participant state for sender (seen + read)
+        state, _ = ConversationParticipantState.objects.get_or_create(
+            conversation=conversation,
+            user=user,
+        )
+        now = timezone.now()
+        state.last_seen_at = now
+        state.last_read_at = now
+        state.is_typing = False
+        state.save(update_fields=["last_seen_at", "last_read_at", "is_typing"])
 
         # notifications
         if user.id == conversation.buyer_id:
@@ -1022,6 +1209,59 @@ class MessageViewSet(viewsets.ModelViewSet):
                 "message_id": msg.id,
             },
         )
+
+        # realtime: broadcast kwa WebSocket group ya conversation hii
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            data = MessageSerializer(
+                msg, context={"request": self.request}
+            ).data
+
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{conversation.id}",
+                {
+                    "type": "chat.message",
+                    "message": data,
+                },
+            )
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        """
+        Tandika ujumbe mmoja kama umesomwa (READ) kwa current user.
+        """
+        msg = self.get_object()
+        user = request.user
+        conversation = msg.conversation
+
+        if not (
+            conversation.buyer_id == user.id
+            or conversation.seller.user_id == user.id
+        ):
+            return Response(
+                {"detail": "You are not part of this conversation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if msg.sender_id == user.id:
+            # usijandikie ujumbe wako mwenyewe kama unread/read
+            return Response({"is_read": msg.is_read})
+
+        if not msg.is_read:
+            msg.is_read = True
+            msg.status = Message.STATUS_READ
+            msg.save(update_fields=["is_read", "status"])
+
+            state, _ = ConversationParticipantState.objects.get_or_create(
+                conversation=conversation,
+                user=user,
+            )
+            now = timezone.now()
+            state.last_seen_at = now
+            state.last_read_at = now
+            state.save(update_fields=["last_seen_at", "last_read_at"])
+
+        return Response({"is_read": msg.is_read})
 
 
 # =========================

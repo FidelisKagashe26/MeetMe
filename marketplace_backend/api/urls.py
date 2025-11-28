@@ -8,6 +8,10 @@ from rest_framework_simplejwt.views import (
 
 from . import views
 
+# ============================
+#  DRF ROUTER
+# ============================
+
 router = DefaultRouter()
 
 # MAIN ENTITIES
@@ -30,6 +34,7 @@ router.register(r"messages", views.MessageViewSet, basename="message")
 
 # NOTIFICATIONS
 router.register(r"notifications", views.NotificationViewSet, basename="notification")
+
 
 urlpatterns = [
     # ======================
