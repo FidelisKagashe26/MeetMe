@@ -858,7 +858,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     """
     Serializer kwa ujumbe mmoja kwenye conversation (read)
-    WhatsApp style: ina sender full mini, status, timestamps.
+    WhatsApp style: ina sender mini, status, timestamps.
     """
 
     sender = UserMiniSerializer(read_only=True)
@@ -892,7 +892,7 @@ class MessageCreateSerializer(serializers.ModelSerializer):
 
     Body:
     {
-        "conversation": 1,
+        "conversation": 1,   # id ya conversation
         "text": "Habari, hii bidhaa bado ipo?"
     }
     """
@@ -900,6 +900,15 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ["conversation", "text"]
+
+    def validate_conversation(self, conversation):
+        """
+        Hakikisha conversation ipo kabisa.
+        (Check hii ya msingi inasaidia kujizuia na NULL).
+        """
+        if conversation is None:
+            raise serializers.ValidationError("conversation is required.")
+        return conversation
 
 
 class ConversationParticipantStateSerializer(serializers.ModelSerializer):
@@ -987,7 +996,6 @@ class ConversationSerializer(serializers.ModelSerializer):
         if request is None or not request.user.is_authenticated:
             return False
         user = request.user
-        # other participant(s) typing?
         states = obj.participant_states.exclude(user=user)
         return states.filter(is_typing=True).exists()
 
@@ -1047,7 +1055,6 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "user", "created_at"]
-
 
 # =========================
 #  EXTRA SERIALIZERS FOR AUTH (JWT) & UTIL ENDPOINTS

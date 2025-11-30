@@ -12,9 +12,6 @@ import { useAuth } from "../contexts/AuthContext";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
 
-// ==== TYPES KUTOKA API MPYA ====
-
-// lazima ilingane na UserMini ya OpenAPI
 interface UserMini {
   id: number;
   username: string;
@@ -98,7 +95,6 @@ interface MessageCreatePayload {
   text: string;
 }
 
-// ====== ERROR HELPER ======
 type DRFErrorResponse =
   | {
       error?: string;
@@ -131,10 +127,7 @@ const getProductMainImage = (product: ProductMini | null): string | null => {
   return null;
 };
 
-// ========== WEB SOCKET HELPER ==========
-
 const buildWebSocketUrl = (conversationPk: number): string => {
-  // Jaribu kuchukua base URL kutoka kwa apiClient kama ipo
   const base =
     (apiClient.defaults.baseURL as string | undefined) ||
     window.location.origin;
@@ -149,8 +142,6 @@ const buildWebSocketUrl = (conversationPk: number): string => {
   const isSecure = url.protocol === "https:";
   url.protocol = isSecure ? "wss:" : "ws:";
 
-  // IMPORTANT: hii path i-match na Django Channels routing yako
-  // mfano: path("ws/chat/<int:conversation_id>/", ChatConsumer.as_asgi())
   url.pathname = `/ws/chat/${conversationPk}/`;
 
   const token =
@@ -158,9 +149,7 @@ const buildWebSocketUrl = (conversationPk: number): string => {
     localStorage.getItem("access") ||
     localStorage.getItem("token");
 
-  if (token) {
-    url.searchParams.set("token", token);
-  }
+  if (token) url.searchParams.set("token", token);
 
   return url.toString();
 };
@@ -172,28 +161,30 @@ const ChatPage: React.FC = () => {
   const productIdParam = searchParams.get("product");
   const sellerIdParam = searchParams.get("seller");
   const conversationParam = searchParams.get("conversation");
-  const orderIdParam = searchParams.get("order"); // future use kama utaiunganisha order->chat
+  const orderIdParam = searchParams.get("order"); // future use
 
-  const initialConversationId =
+  const conversationFromUrl =
     conversationParam !== null && !Number.isNaN(Number(conversationParam))
       ? Number(conversationParam)
       : null;
 
-  const [conversationId, setConversationId] = useState<number | null>(
-    initialConversationId
-  );
+  const [conversationId, setConversationId] =
+    useState<number | null>(conversationFromUrl);
+  const [hasBootstrapped, setHasBootstrapped] = useState(false);
+
   const [conversationDetail, setConversationDetail] =
     useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [participantStates, setParticipantStates] = useState<
     ConversationParticipantState[]
   >([]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [sending, setSending] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState<string>("");
 
-  // Context fallback wakati conversation haijaload
+  // Fallback context wakati bado hatujapata conversation
   const [fallbackProduct, setFallbackProduct] = useState<ProductMini | null>(
     null
   );
@@ -206,15 +197,14 @@ const ChatPage: React.FC = () => {
   const effectiveSeller =
     conversationDetail?.seller || fallbackSeller || null;
 
-  // ==== REALTIME STATE ====
+  // WebSocket realtime state
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<number | undefined>(undefined);
   const [wsConnected, setWsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Auto-scroll
+  // Auto scroll
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({
@@ -224,7 +214,6 @@ const ChatPage: React.FC = () => {
     }
   }, []);
 
-  // Formatters
   const shopName =
     effectiveSeller?.business_name ?? "Seller shop";
 
@@ -271,7 +260,7 @@ const ChatPage: React.FC = () => {
     return null;
   };
 
-  // =============== REFRESH CONVERSATION (REST) ===============
+  // ================== REST REFRESH ==================
   const refreshConversation = useCallback(
     async (conversationPk: number) => {
       setLoading(true);
@@ -285,14 +274,14 @@ const ChatPage: React.FC = () => {
         setMessages(data.messages || []);
         setParticipantStates(data.participant_states || []);
 
-        // mark all as seen (hai-block UI)
+        // mark all as seen (non blocking)
         void apiClient
           .post(`/api/conversations/${conversationPk}/mark_seen/`, {})
           .catch((markError) => {
             console.error("Failed to mark messages as seen", markError);
           });
-      } catch (errorFetch) {
-        console.error(errorFetch);
+      } catch (err) {
+        console.error(err);
         setError("Imeshindikana kupakia messages. Jaribu tena baadae.");
       } finally {
         setLoading(false);
@@ -301,7 +290,7 @@ const ChatPage: React.FC = () => {
     []
   );
 
-  // =============== WEBSOCKET INCOMING HANDLER ===============
+  // ================== HANDLE WS EVENTS ==================
   const handleIncomingEvent = useCallback(
     (event: MessageEvent<string>) => {
       try {
@@ -310,9 +299,9 @@ const ChatPage: React.FC = () => {
 
         const type = dataRaw.type as string | undefined;
 
-        // MESSAGE CREATED (new message)
         if (type === "message.created" && dataRaw.message) {
           const incoming = dataRaw.message as Message;
+
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === incoming.id);
             if (exists) {
@@ -331,7 +320,6 @@ const ChatPage: React.FC = () => {
               : prev
           );
 
-          // auto mark seen kama message si ya kwako
           if (user && incoming.sender.id !== user.id && conversationId) {
             void apiClient
               .post(`/api/conversations/${conversationId}/mark_seen/`, {})
@@ -344,7 +332,6 @@ const ChatPage: React.FC = () => {
           return;
         }
 
-        // MESSAGE UPDATED (status / text)
         if (type === "message.updated" && dataRaw.message) {
           const updated = dataRaw.message as Message;
           setMessages((prev) =>
@@ -353,7 +340,6 @@ const ChatPage: React.FC = () => {
           return;
         }
 
-        // PARTICIPANT TYPING
         if (type === "conversation.typing" && dataRaw.state) {
           const state = dataRaw.state as ConversationParticipantState;
           setParticipantStates((prev) => {
@@ -366,7 +352,6 @@ const ChatPage: React.FC = () => {
           return;
         }
 
-        // FULL SYNC (optional event kama backend yako ina broadcast bulk)
         if (type === "conversation.bulk_state") {
           if (Array.isArray(dataRaw.messages)) {
             setMessages(dataRaw.messages as Message[]);
@@ -377,7 +362,6 @@ const ChatPage: React.FC = () => {
             );
           }
           scrollToBottom();
-          return;
         }
       } catch (err) {
         console.error("Failed to parse WS message", err);
@@ -386,38 +370,36 @@ const ChatPage: React.FC = () => {
     [conversationId, scrollToBottom, user]
   );
 
-  // 1) Ensure conversationId from URL or create new
+  // ================== BOOTSTRAP CONVERSATION ==================
   useEffect(() => {
     if (!user) return;
+    if (hasBootstrapped) return;
 
-    const convIdFromUrl =
-      conversationParam !== null && !Number.isNaN(Number(conversationParam))
-        ? Number(conversationParam)
-        : null;
-
-    const setupConversation = async () => {
+    const bootstrap = async () => {
       try {
         setError(null);
+        setLoading(true);
 
-        // kama URL ina ?conversation=... na state yetu tofauti, override
-        if (convIdFromUrl && convIdFromUrl !== conversationId) {
-          setConversationId(convIdFromUrl);
+        // 1) Kama URL tayari ina conversation, tumia hiyo
+        if (conversationFromUrl) {
+          setConversationId(conversationFromUrl);
+          setHasBootstrapped(true);
           return;
         }
 
-        // kama tayari tuna conversationId, acha backend ajibu detail
+        // 2) Kama state tayari ina conversation, tumia hiyo
         if (conversationId) {
+          setHasBootstrapped(true);
           return;
         }
 
-        // TODO: hapa unaweza baadaye kuongeza logic ya ku-get conversation kwa orderId
-
-        // kama hakuna conversation kabisa, jaribu ku-create kwa seller+product
+        // 3) Otherwise, jaribu ku-create kwa seller + product
         if (!sellerIdParam) {
           setError(
             "Haijabainika muuzaji wa hii chat. Tafadhali fungua chat kupitia product."
           );
           setLoading(false);
+          setHasBootstrapped(true);
           return;
         }
 
@@ -426,11 +408,14 @@ const ChatPage: React.FC = () => {
         };
 
         if (productIdParam) {
-          const productParsed = Number(productIdParam);
-          if (!Number.isNaN(productParsed)) {
-            payload.product_id = productParsed;
+          const productPk = Number(productIdParam);
+          if (!Number.isNaN(productPk)) {
+            payload.product_id = productPk;
           }
         }
+
+        // orderIdParam unaweza kuitumia baadaye upande wa backend bila kubadilisha hapa
+        void orderIdParam;
 
         const res = await apiClient.post<Conversation>(
           "/api/conversations/",
@@ -460,29 +445,31 @@ const ChatPage: React.FC = () => {
         }
 
         setError(message);
+      } finally {
         setLoading(false);
+        setHasBootstrapped(true);
       }
     };
 
-    void setupConversation();
+    void bootstrap();
   }, [
     user,
+    hasBootstrapped,
+    conversationFromUrl,
     conversationId,
-    conversationParam,
     productIdParam,
     sellerIdParam,
     orderIdParam,
   ]);
 
-  // 2) Kila conversationId ikipatikana, pakua detail + messages mara ya kwanza
+  // ================== LOAD CONVERSATION DETAIL ==================
   useEffect(() => {
     if (!user) return;
     if (!conversationId) return;
-
     void refreshConversation(conversationId);
   }, [user, conversationId, refreshConversation]);
 
-  // 3) Fallback context wakati bado hatujapata conversation
+  // ================== FALLBACK CONTEXT (product / seller) ==================
   useEffect(() => {
     const loadFallbackContext = async () => {
       try {
@@ -507,18 +494,15 @@ const ChatPage: React.FC = () => {
             setFallbackSeller(sellerRes.data);
           }
         }
-      } catch (errorContext) {
-        console.error(
-          "Failed to load fallback chat context (seller/product)",
-          errorContext
-        );
+      } catch (err) {
+        console.error("Failed to load fallback chat context", err);
       }
     };
 
     void loadFallbackContext();
   }, [conversationId, productIdParam, sellerIdParam]);
 
-  // 4) WebSocket connection per conversation
+  // ================== WEBSOCKET CONNECTION ==================
   useEffect(() => {
     if (!user) return;
     if (!conversationId) return;
@@ -529,7 +513,6 @@ const ChatPage: React.FC = () => {
 
     ws.onopen = () => {
       setWsConnected(true);
-      // optional: mtumie backend "join"
       try {
         ws.send(
           JSON.stringify({
@@ -566,14 +549,14 @@ const ChatPage: React.FC = () => {
     };
   }, [conversationId, handleIncomingEvent, user]);
 
-  // 5) Auto scroll kila message mpya
+  // ================== AUTO SCROLL ==================
   useEffect(() => {
     if (messages.length > 0) {
       scrollToBottom();
     }
   }, [messages.length, scrollToBottom]);
 
-  // 6) Typing events (kutuma kwa backend)
+  // ================== TYPING ==================
   const sendTyping = useCallback(
     (typing: boolean) => {
       if (!wsRef.current) return;
@@ -614,7 +597,6 @@ const ChatPage: React.FC = () => {
         typingTimeoutRef.current = undefined;
       }, 2500);
     } else {
-      // cleared
       setIsTyping(false);
       sendTyping(false);
       if (typingTimeoutRef.current) {
@@ -645,11 +627,16 @@ const ChatPage: React.FC = () => {
         text: textToSend,
       };
 
-      await apiClient.post<Message>("/api/messages/", payload);
+      const res = await apiClient.post<Message>("/api/messages/", payload);
       setNewMessage("");
 
-      // Kama WebSocket iko live, tuta-tegemea event ya "message.created"
-      // Kama haija-connect, tumia fallback ya REST
+      // optimistic add (ikiwa WS haijaja bado au imechelewa)
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === res.data.id);
+        if (exists) return prev;
+        return [...prev, res.data];
+      });
+
       if (!wsConnected) {
         await refreshConversation(conversationId);
       }
@@ -688,12 +675,12 @@ const ChatPage: React.FC = () => {
           </h1>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
             Tuma ujumbe kwa muuzaji kujadiliana kuhusu product na details za
-            miamala.
+            miamala kwa muda halisi (real-time).
           </p>
         </header>
 
         <section className="flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-          {/* HEADER NDOGO YA SELLER JUU YA MESSAGES */}
+          {/* SELLER HEADER */}
           {effectiveSeller && (
             <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
               <div className="flex items-center gap-2">
@@ -731,7 +718,7 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
-          {/* Messages list */}
+          {/* MESSAGES LIST */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
             {loading ? (
               <div className="text-sm text-slate-500">
@@ -785,11 +772,10 @@ const ChatPage: React.FC = () => {
               </div>
             )}
 
-            {/* Dummy element kwa auto scroll */}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* PINNED PRODUCT JUU YA SEHEMU YA KUANDIKA (WhatsApp style) */}
+          {/* PINNED PRODUCT (WhatsApp style) */}
           {effectiveProduct && (
             <div className="border-t border-slate-200 dark:border-slate-800 px-3 py-2 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
               {productImage ? (
@@ -821,7 +807,7 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
-          {/* Input */}
+          {/* INPUT */}
           <form
             onSubmit={handleSend}
             className="border-t border-slate-200 dark:border-slate-800 p-3 flex items-center gap-2 bg-slate-50/60 dark:bg-slate-900/80"
@@ -848,7 +834,7 @@ const ChatPage: React.FC = () => {
 
       <MainFooter />
 
-      {/* PRODUCT MODAL – haisitishi chat, user anaangalia details kisha anarudi */}
+      {/* PRODUCT MODAL */}
       {productModalOpen && effectiveProduct && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
           <div className="max-w-sm w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4 relative">

@@ -1,8 +1,10 @@
 # marketplace_backend/channels_jwt_middleware.py
 
-from urllib.parse import parse_qs
+from __future__ import annotations
 
 import logging
+from urllib.parse import parse_qs
+
 from asgiref.sync import sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth.models import AnonymousUser
@@ -29,26 +31,22 @@ class JWTAuthMiddleware(BaseMiddleware):
     """
 
     async def __call__(self, scope, receive, send):
-        # safeguard ya DB connections (recommended na Django + Channels)
+        # Safeguard ya DB connections (recommended na Django + Channels)
         close_old_connections()
 
         # default: user asiyejulikana
         scope["user"] = AnonymousUser()
 
-        # -------------------------------
-        # 1. Jaribu kusoma token kwenye query string (?token=...)
-        # -------------------------------
         query_string = scope.get("query_string", b"").decode()
         qs = parse_qs(query_string)
 
-        raw_token = None
+        raw_token: str | None = None
 
+        # 1) Token kupitia query string (?token=...)
         if "token" in qs and qs["token"]:
             raw_token = qs["token"][0].strip()
 
-        # -------------------------------
-        # 2. Kama hakuna token kwenye query, jaribu headers (Authorization: Bearer x)
-        # -------------------------------
+        # 2) Kama hakuna token kwenye query, jaribu headers (Authorization: Bearer x)
         if not raw_token:
             headers = scope.get("headers", [])
             for name, value in headers:
@@ -56,15 +54,13 @@ class JWTAuthMiddleware(BaseMiddleware):
                 if name.lower() == b"authorization":
                     try:
                         auth_header = value.decode()
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         auth_header = ""
                     if auth_header.lower().startswith("bearer "):
                         raw_token = auth_header.split(" ", 1)[1].strip()
                     break
 
-        # -------------------------------
-        # 3. Kama tuna token, ituthibitishe kwa SimpleJWT
-        # -------------------------------
+        # 3) Kama tuna token, ithibitishe kwa SimpleJWT
         if raw_token:
             jwt_auth = JWTAuthentication()
             try:

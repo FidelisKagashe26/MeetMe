@@ -987,9 +987,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return self.queryset.filter(
+        qs = self.queryset.filter(
             Q(buyer=user) | Q(seller__user=user)
         ).distinct()
+
+        # optional filter: ?product_id= & ?seller_id=
+        product_id = self.request.query_params.get("product_id")
+        seller_id = self.request.query_params.get("seller_id")
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        if seller_id:
+            qs = qs.filter(seller_id=seller_id)
+
+        return qs
 
     def create(self, request, *args, **kwargs):
         """
@@ -1156,26 +1166,71 @@ class MessageViewSet(viewsets.ModelViewSet):
         return MessageSerializer
 
     def get_queryset(self):
+        """
+        Rudisha messages ambazo mimi ni participant (buyer au seller.user).
+        Optional filter:
+          ?conversation_id=<id> au ?conversation=<id>
+        """
         user = self.request.user
-        return self.queryset.filter(
+        qs = self.queryset.filter(
             Q(conversation__buyer=user) | Q(conversation__seller__user=user)
         ).distinct()
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        conversation = serializer.validated_data.get("conversation")
+        conv_id = (
+            self.request.query_params.get("conversation_id")
+            or self.request.query_params.get("conversation")
+        )
+        if conv_id:
+            qs = qs.filter(conversation_id=conv_id)
 
-        # hakikisha user ni sehemu ya hiyo conversation
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create message mpya ndani ya conversation:
+
+        Body:
+        {
+          "conversation": 1,
+          "text": "Habari..."
+        }
+
+        - Inathibitisha kuwa current user ni participant.
+        - Inahakikisha conversation_id sio NULL (tunachukua kutoka validated_data).
+        - Inahifadhi Message manual (Message.objects.create(...)).
+        - Inafanya:
+            * Conversation.last_message_at update
+            * ParticipantState kwa sender (last_seen, last_read)
+            * Notification kwa mtu wa pili
+            * Realtime WebSocket push -> group "chat_<conversation_id>"
+        """
+        user = request.user
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        conversation = serializer.validated_data["conversation"]
+        text = serializer.validated_data["text"]
+
+        # hakikisha user ni sehemu ya hii conversation
         if not (
             conversation.buyer_id == user.id
             or conversation.seller.user_id == user.id
         ):
-            raise ValidationError(
-                {"detail": "You are not part of this conversation."}
+            return Response(
+                {"detail": "You are not part of this conversation."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
-        # hifadhi message
-        msg = serializer.save(sender=user)
+        # HAPA NDIO TUNAFIX NOT NULL:
+        # Tunatengeneza Message kwa mkono, tukipita na conversation=...
+        msg = Message.objects.create(
+            conversation=conversation,
+            sender=user,
+            text=text,
+            status=Message.STATUS_SENT,
+            is_read=False,
+        )
 
         # update last_message_at
         Conversation.objects.filter(pk=conversation.pk).update(
@@ -1193,7 +1248,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         state.is_typing = False
         state.save(update_fields=["last_seen_at", "last_read_at", "is_typing"])
 
-        # notifications
+        # notifications: target ni participant mwingine
         if user.id == conversation.buyer_id:
             target_user = conversation.seller.user
         else:
@@ -1213,17 +1268,23 @@ class MessageViewSet(viewsets.ModelViewSet):
         # realtime: broadcast kwa WebSocket group ya conversation hii
         channel_layer = get_channel_layer()
         if channel_layer is not None:
-            data = MessageSerializer(
-                msg, context={"request": self.request}
+            payload = MessageSerializer(
+                msg,
+                context={"request": request},
             ).data
 
             async_to_sync(channel_layer.group_send)(
                 f"chat_{conversation.id}",
                 {
                     "type": "chat.message",
-                    "message": data,
+                    "message": payload,
                 },
             )
+
+        # response ya HTTP
+        output = MessageSerializer(msg, context={"request": request})
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):

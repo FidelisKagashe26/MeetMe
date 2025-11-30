@@ -38,7 +38,12 @@ interface OrderProduct {
   shop_name: string;
 }
 
-type OrderStatus = "pending" | "accepted" | "rejected" | "cancelled" | "completed";
+type OrderStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "cancelled"
+  | "completed";
 
 interface OrderDetail {
   id: number;
@@ -137,8 +142,12 @@ const OrderDetailPage: React.FC = () => {
 
   const handleOpenChat = () => {
     if (!order) return;
-    // kwa sasa tunatuma product + seller, future unaweza ongeza order param
-    navigate(`/chat?product=${order.product.id}&seller=${order.seller.id}`);
+    // Ina-link kwenye ChatPage ambayo inatumia WebSocket kwa realtime
+    const params = new URLSearchParams();
+    params.set("product", String(order.product.id));
+    params.set("seller", String(order.seller.id));
+    params.set("order", String(order.id)); // future: ukitaka specific conversation per order
+    navigate(`/chat?${params.toString()}`);
   };
 
   const product = order?.product;
@@ -361,7 +370,7 @@ const OrderDetailPage: React.FC = () => {
                 </div>
               </section>
 
-              {/* PRODUCT CARD (badala ya list ya items) */}
+              {/* PRODUCT CARD */}
               <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-sm font-semibold text-slate-900 dark:text-white">

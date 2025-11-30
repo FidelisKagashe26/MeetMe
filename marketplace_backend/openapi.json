@@ -1630,7 +1630,7 @@
             },
             "post": {
                 "operationId": "messages_create",
-                "description": "Chat messages ndani ya conversation",
+                "description": "Create message mpya ndani ya conversation:\n\nBody:\n{\n  \"conversation\": 1,\n  \"text\": \"Habari...\"\n}\n\n- Inathibitisha kuwa current user ni participant.\n- Inahakikisha conversation_id sio NULL (tunachukua kutoka validated_data).\n- Inahifadhi Message manual (Message.objects.create(...)).\n- Inafanya:\n    * Conversation.last_message_at update\n    * ParticipantState kwa sender (last_seen, last_read)\n    * Notification kwa mtu wa pili\n    * Realtime WebSocket push -> group \"chat_<conversation_id>\"",
                 "tags": [
                     "messages"
                 ],
@@ -4915,7 +4915,7 @@
             },
             "Message": {
                 "type": "object",
-                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender full mini, status, timestamps.",
+                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender mini, status, timestamps.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -4972,7 +4972,7 @@
             },
             "MessageCreate": {
                 "type": "object",
-                "description": "Serializer kwa kutuma message mpya (create)\n\nBody:\n{\n    \"conversation\": 1,\n    \"text\": \"Habari, hii bidhaa bado ipo?\"\n}",
+                "description": "Serializer kwa kutuma message mpya (create)\n\nBody:\n{\n    \"conversation\": 1,   # id ya conversation\n    \"text\": \"Habari, hii bidhaa bado ipo?\"\n}",
                 "properties": {
                     "conversation": {
                         "type": "integer"
@@ -4988,7 +4988,7 @@
             },
             "MessageCreateRequest": {
                 "type": "object",
-                "description": "Serializer kwa kutuma message mpya (create)\n\nBody:\n{\n    \"conversation\": 1,\n    \"text\": \"Habari, hii bidhaa bado ipo?\"\n}",
+                "description": "Serializer kwa kutuma message mpya (create)\n\nBody:\n{\n    \"conversation\": 1,   # id ya conversation\n    \"text\": \"Habari, hii bidhaa bado ipo?\"\n}",
                 "properties": {
                     "conversation": {
                         "type": "integer"
@@ -5005,7 +5005,7 @@
             },
             "MessageRequest": {
                 "type": "object",
-                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender full mini, status, timestamps.",
+                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender mini, status, timestamps.",
                 "properties": {
                     "text": {
                         "type": "string",
@@ -5711,7 +5711,7 @@
             },
             "PatchedMessageRequest": {
                 "type": "object",
-                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender full mini, status, timestamps.",
+                "description": "Serializer kwa ujumbe mmoja kwenye conversation (read)\nWhatsApp style: ina sender mini, status, timestamps.",
                 "properties": {
                     "text": {
                         "type": "string",
@@ -7081,3 +7081,4 @@
         }
     }
 }
+ 

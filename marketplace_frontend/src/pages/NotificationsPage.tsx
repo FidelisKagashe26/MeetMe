@@ -5,7 +5,11 @@ import apiClient from "../lib/apiClient";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
 
-type NotifType = "order_new" | "order_status" | "chat_message" | "order_created";
+type NotifType =
+  | "order_new"
+  | "order_status"
+  | "chat_message"
+  | "order_created";
 
 interface NotificationData {
   order_id?: number;
@@ -13,7 +17,6 @@ interface NotificationData {
   product_id?: number;
   seller_id?: number;
   buyer_id?: number;
-  // unaweza kuongeza vitu vingine baadaye
 }
 
 interface Notification {
@@ -134,7 +137,6 @@ const NotificationsPage: React.FC = () => {
       } else {
         console.warn("Order notification haina order_id kwenye data:", notif);
       }
-      return;
     }
   };
 

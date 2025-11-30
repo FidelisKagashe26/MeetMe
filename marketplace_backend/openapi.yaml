@@ -998,7 +998,23 @@ paths:
           description: ''
     post:
       operationId: messages_create
-      description: Chat messages ndani ya conversation
+      description: |-
+        Create message mpya ndani ya conversation:
+
+        Body:
+        {
+          "conversation": 1,
+          "text": "Habari..."
+        }
+
+        - Inathibitisha kuwa current user ni participant.
+        - Inahakikisha conversation_id sio NULL (tunachukua kutoka validated_data).
+        - Inahifadhi Message manual (Message.objects.create(...)).
+        - Inafanya:
+            * Conversation.last_message_at update
+            * ParticipantState kwa sender (last_seen, last_read)
+            * Notification kwa mtu wa pili
+            * Realtime WebSocket push -> group "chat_<conversation_id>"
       tags:
       - messages
       requestBody:
@@ -3012,7 +3028,7 @@ components:
       type: object
       description: |-
         Serializer kwa ujumbe mmoja kwenye conversation (read)
-        WhatsApp style: ina sender full mini, status, timestamps.
+        WhatsApp style: ina sender mini, status, timestamps.
       properties:
         id:
           type: integer
@@ -3057,7 +3073,7 @@ components:
 
         Body:
         {
-            "conversation": 1,
+            "conversation": 1,   # id ya conversation
             "text": "Habari, hii bidhaa bado ipo?"
         }
       properties:
@@ -3075,7 +3091,7 @@ components:
 
         Body:
         {
-            "conversation": 1,
+            "conversation": 1,   # id ya conversation
             "text": "Habari, hii bidhaa bado ipo?"
         }
       properties:
@@ -3091,7 +3107,7 @@ components:
       type: object
       description: |-
         Serializer kwa ujumbe mmoja kwenye conversation (read)
-        WhatsApp style: ina sender full mini, status, timestamps.
+        WhatsApp style: ina sender mini, status, timestamps.
       properties:
         text:
           type: string
@@ -3638,7 +3654,7 @@ components:
       type: object
       description: |-
         Serializer kwa ujumbe mmoja kwenye conversation (read)
-        WhatsApp style: ina sender full mini, status, timestamps.
+        WhatsApp style: ina sender mini, status, timestamps.
       properties:
         text:
           type: string

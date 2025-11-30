@@ -22,7 +22,7 @@ interface Product {
   id: number;
   name: string;
   description: string;
-  price: string; // decimal as string
+  price: string; // decimal kama string
   currency: string;
   image_url?: string | null;
   image?: string | null;
@@ -35,10 +35,7 @@ interface Product {
   latitude?: string | null;
   longitude?: string | null;
 
-  // gallery from backend
   images?: ProductImage[];
-
-  // likes info from backend
   likes_count?: number;
   is_liked_by_me?: boolean;
   is_liked?: boolean;
@@ -70,7 +67,7 @@ const ProductsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // FORM
+  // Form state
   const [query, setQuery] = useState<string>("");
   const [locationText, setLocationText] = useState<string>("");
 
@@ -79,7 +76,7 @@ const ProductsPage: React.FC = () => {
   const [geoLoading, setGeoLoading] = useState<boolean>(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  // Active filters
+  // Active filters (actual search that is applied)
   const [activeQuery, setActiveQuery] = useState<string>("");
   const [activeLocation, setActiveLocation] = useState<string>("");
   const [activeCoords, setActiveCoords] = useState<Coords | null>(null);
@@ -92,10 +89,8 @@ const ProductsPage: React.FC = () => {
   // Help panel
   const [showHelp, setShowHelp] = useState<boolean>(false);
 
-  // Likes loading state kwa kila product
+  // Per-product loading states
   const [likeLoading, setLikeLoading] = useState<Record<number, boolean>>({});
-
-  // Chat loading state kwa kila product
   const [chatLoading, setChatLoading] = useState<Record<number, boolean>>({});
 
   const fetchProducts = useCallback(async () => {
@@ -106,17 +101,10 @@ const ProductsPage: React.FC = () => {
       const params = new URLSearchParams();
       params.set("page", String(page));
 
-      if (activeQuery) {
-        params.set("search", activeQuery);
-      }
-
-      if (activeLocation) {
-        params.set("location", activeLocation);
-      }
+      if (activeQuery) params.set("search", activeQuery);
+      if (activeLocation) params.set("location", activeLocation);
 
       let url: string;
-
-      // Kama tuna coordinates, tumia /products/nearby/
       if (activeCoords) {
         params.set("lat", String(activeCoords.lat));
         params.set("lng", String(activeCoords.lng));
@@ -193,7 +181,6 @@ const ProductsPage: React.FC = () => {
     setPage(1);
   };
 
-  // ==== KUCHAGUA PICHA KUU YA PRODUCT ====
   const getMainImage = (product: Product): string | null => {
     const primary =
       product.images?.find((img) => img.is_primary) ?? product.images?.[0];
@@ -206,10 +193,8 @@ const ProductsPage: React.FC = () => {
     );
   };
 
-  // ==== TOGGLE LIKE / UNLIKE ====
   const handleToggleLike = async (productId: number) => {
     if (!user) {
-      // msukume kwenye login na next param
       const next = `${location.pathname}${location.search}`;
       navigate(`/login?next=${encodeURIComponent(next)}`);
       return;
@@ -221,18 +206,15 @@ const ProductsPage: React.FC = () => {
       await apiClient.post("/api/product-likes/toggle/", {
         product_id: productId,
       });
-
-      // Refresh list ili likes_count & is_liked_by_me vijae kutoka backend
+      // refresh ili likes_count & is_liked_by_me zije live
       await fetchProducts();
     } catch (err) {
       console.error("Failed to toggle like", err);
-      // TODO: unaweza kuongeza toast ya error hapo baadaye
     } finally {
       setLikeLoading((prev) => ({ ...prev, [productId]: false }));
     }
   };
 
-  // ==== OPEN / CREATE CONVERSATION FOR PRODUCT / SELLER ====
   const handleOpenChat = async (productId: number, sellerId?: number) => {
     if (!user) {
       const next = `${location.pathname}${location.search}`;
@@ -241,7 +223,6 @@ const ProductsPage: React.FC = () => {
     }
 
     if (!sellerId) {
-      // Kama hatuna sellerId, mpeleke kwenye product details tu
       navigate(`/products/${productId}`);
       return;
     }
@@ -249,6 +230,7 @@ const ProductsPage: React.FC = () => {
     setChatLoading((prev) => ({ ...prev, [productId]: true }));
 
     try {
+      // create or reuse conversation then tumia WebSocket upande wa ChatPage
       const res = await apiClient.post<ConversationCreateResponse>(
         "/api/conversations/",
         {
@@ -258,7 +240,6 @@ const ProductsPage: React.FC = () => {
       );
 
       const conversationId = res.data.id;
-
       const params = new URLSearchParams();
       params.set("conversation", String(conversationId));
       params.set("product", String(productId));
@@ -290,7 +271,8 @@ const ProductsPage: React.FC = () => {
                 Marketplace products
               </h1>
               <p className="text-[11px] md:text-[12px] text-slate-500">
-                Search items from different shops, you decide how to filter.
+                Search items from different shops, chat in real time with
+                sellers and place your orders.
               </p>
             </div>
 
@@ -321,24 +303,26 @@ const ProductsPage: React.FC = () => {
               </p>
               <ul className="list-disc list-inside space-y-0.5">
                 <li>
-                  Type product name kwenye{" "}
+                  Andika jina la bidhaa kwenye{" "}
                   <span className="font-semibold">
-                    "What are you looking for?"
+                    &quot;What are you looking for?&quot;
                   </span>
                 </li>
                 <li>
                   Tumia{" "}
-                  <span className="font-semibold">"Where are you?"</span> au{" "}
-                  <span className="font-semibold">"Use my location"</span> kupata
-                  products zilizo karibu.
+                  <span className="font-semibold">&quot;Where are you?&quot;</span>{" "}
+                  au{" "}
+                  <span className="font-semibold">Use my location</span> kupata
+                  bidhaa zilizo karibu nawe.
                 </li>
                 <li>
-                  Bofya <span className="font-semibold">"View details"</span>{" "}
-                  kuona maelezo ya product na kuanza oda.
+                  Bofya{" "}
+                  <span className="font-semibold">View details &amp; order</span>{" "}
+                  kuona maelezo na kuanza oda.
                 </li>
                 <li>
-                  Tumia heart icon ❤️ ku-like product, na{" "}
-                  <span className="font-semibold">Chat</span> kuzungumza na
+                  Bofya <span className="font-semibold">Chat</span> kuanza{" "}
+                  <span className="font-semibold">real-time chat</span> na
                   muuzaji.
                 </li>
               </ul>
@@ -412,12 +396,12 @@ const ProductsPage: React.FC = () => {
                 <span>Active filters:</span>
                 {activeQuery && (
                   <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                    product: "{activeQuery}"
+                    product: &quot;{activeQuery}&quot;
                   </span>
                 )}
                 {activeLocation && (
                   <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                    location: "{activeLocation}"
+                    location: &quot;{activeLocation}&quot;
                   </span>
                 )}
                 {activeCoords && !activeLocation && (
@@ -528,12 +512,12 @@ const ProductsPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Shop badge (top-left) */}
+                    {/* Shop badge */}
                     <div className="absolute left-2 top-2 bg-white/90 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm line-clamp-1 max-w-[60%]">
                       {shopName}
                     </div>
 
-                    {/* Like button (top-right) */}
+                    {/* Like button */}
                     <button
                       type="button"
                       onClick={() => void handleToggleLike(product.id)}
@@ -554,7 +538,7 @@ const ProductsPage: React.FC = () => {
                       )}
                     </button>
 
-                    {/* Distance (bottom-right) */}
+                    {/* Distance */}
                     {distanceLabel && (
                       <div className="absolute right-2 bottom-2 bg-slate-900/85 text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm">
                         {distanceLabel}

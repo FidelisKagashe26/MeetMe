@@ -21,7 +21,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     """
     WebSocket consumer kwa mazungumzo ya 1-to-1 (buyer <-> seller).
 
-    URL format (mustahakika na routing yako):
+    URL format:
       ws://<host>/ws/chat/<conversation_id>/?token=<JWT_ACCESS_TOKEN>
 
     Mambo muhimu:
@@ -33,14 +33,17 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         * Ikiwa OK, ina-join group 'chat_<conversation_id>' na
           kumark messages kama seen kwa huyo user.
     - receive_json():
-        * Inapokea events za "typing":
+        * Hushughulikia "typing" events:
           { "type": "typing", "is_typing": true/false }
-        * (Baadaye tunaweza kuongeza aina zingine kama "read_receipt" n.k.)
+        * Na "ping" (test).
+        * Message halisi za chat zinatumwa kupitia REST (MessageViewSet),
+          kisha zinapokelewa hapa kupitia group_send().
     - chat_message():
-        * Inaitwa na DRF MessageViewSet kupitia channel_layer.group_send()
-          na kutuma message mpya kwa clients wote waliopo kwenye group.
+        * Huitwa na backend kupitia channel_layer.group_send()
+          na kutuma message mpya kwa clients wote wa group hiyo.
     - typing_event():
-        * Inatumiwa kwa participant mwingine kuonyesha "is typing..." live.
+        * Huitwa na backend kwa ajili ya kuonyesha "is typing..." live
+          kwa participant mwingine.
     """
 
     # --------------------------
