@@ -1134,16 +1134,51 @@ class ConversationViewSet(viewsets.ModelViewSet):
             )
 
         is_typing = bool(request.data.get("is_typing", True))
+
         state, _ = ConversationParticipantState.objects.get_or_create(
             conversation=conversation,
             user=user,
         )
+        now = timezone.now()
         state.is_typing = is_typing
-        state.last_typing_at = timezone.now()
+        state.last_typing_at = now
         state.save(update_fields=["is_typing", "last_typing_at"])
 
-        return Response({"is_typing": is_typing})
+        # ====== realtime WebSocket: broadcast typing state ======
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            # payload rahisi lakini inatosha kwa frontend yako
+            payload = {
+                "id": state.id,
+                "conversation": conversation.id,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "email": user.email,
+                },
+                "is_typing": state.is_typing,
+                "last_typing_at": state.last_typing_at.isoformat()
+                if state.last_typing_at
+                else None,
+                "last_seen_at": state.last_seen_at.isoformat()
+                if state.last_seen_at
+                else None,
+                "last_read_at": state.last_read_at.isoformat()
+                if state.last_read_at
+                else None,
+            }
 
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{conversation.id}",
+                {
+                    "type": "conversation.typing",
+                    "state": payload,
+                },
+            )
+
+        return Response({"is_typing": is_typing})
 
 class MessageViewSet(viewsets.ModelViewSet):
     """

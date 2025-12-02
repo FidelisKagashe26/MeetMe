@@ -11,12 +11,19 @@ interface MeResponse {
   email: string | null;
   first_name: string;
   last_name: string;
+  date_joined: string;
+  is_seller: boolean;
+  preferred_language: "en" | "sw";
+  theme: "light" | "dark" | "system";
+  avatar_url: string | null;
 }
 
 interface SettingsResponse {
+  is_seller: boolean;
   preferred_language: "en" | "sw";
   theme: "light" | "dark" | "system";
-  avatar?: string | null; // kutoka kwenye UserProfile.avatar (uri)
+  avatar: string | null; // path/uri ya picha (read/write)
+  avatar_url: string | null; // full URL (read-only)
 }
 
 const AccountProfilePage: React.FC = () => {
@@ -30,9 +37,12 @@ const AccountProfilePage: React.FC = () => {
     last_name: "",
   });
 
-  const [settingsForm, setSettingsForm] = useState({
-    preferred_language: "sw" as "en" | "sw",
-    theme: "light" as "light" | "dark" | "system",
+  const [settingsForm, setSettingsForm] = useState<{
+    preferred_language: "en" | "sw";
+    theme: "light" | "dark" | "system";
+  }>({
+    preferred_language: "sw",
+    theme: "light",
   });
 
   // ---- AVATAR / PROFILE PICTURE ----
@@ -58,6 +68,7 @@ const AccountProfilePage: React.FC = () => {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
+  // ---- INITIAL LOAD: /api/auth/me/ & /api/auth/settings/ ----
   useEffect(() => {
     const load = async () => {
       try {
@@ -69,6 +80,7 @@ const AccountProfilePage: React.FC = () => {
           apiClient.get<SettingsResponse>("/api/auth/settings/"),
         ]);
 
+        // User basic info
         setProfileForm({
           username: meRes.data.username || "",
           email: meRes.data.email || "",
@@ -76,15 +88,27 @@ const AccountProfilePage: React.FC = () => {
           last_name: meRes.data.last_name || "",
         });
 
+        // Preferences – tunachukua kutoka settings (na fallback kutoka meRes)
         setSettingsForm({
-          preferred_language: settingsRes.data.preferred_language || "sw",
-          theme: settingsRes.data.theme || "light",
+          preferred_language:
+            settingsRes.data.preferred_language ||
+            meRes.data.preferred_language ||
+            "sw",
+          theme:
+            settingsRes.data.theme ||
+            meRes.data.theme ||
+            "light",
         });
 
-        // avatar kutoka kwenye UserProfile
-        setAvatarUrl(settingsRes.data.avatar ?? null);
+        // Avatar URL – tunaprefer avatar_url kutoka settings, kisha meRes
+        const initialAvatarUrl =
+          settingsRes.data.avatar_url ||
+          meRes.data.avatar_url ||
+          null;
+
+        setAvatarUrl(initialAvatarUrl);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to load account data:", err);
         setProfileError("Imeshindikana kupakia taarifa za akaunti.");
       } finally {
         setLoading(false);
@@ -94,24 +118,35 @@ const AccountProfilePage: React.FC = () => {
     void load();
   }, []);
 
-  const handleProfileChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setProfileForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSettingsChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
+  const handleSettingsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setSettingsForm((prev) => ({ ...prev, [name]: value }));
+
+    setSettingsForm((prev) => {
+      if (name === "preferred_language") {
+        return {
+          ...prev,
+          preferred_language: value as SettingsResponse["preferred_language"],
+        };
+      }
+
+      if (name === "theme") {
+        return {
+          ...prev,
+          theme: value as SettingsResponse["theme"],
+        };
+      }
+
+      return prev;
+    });
   };
 
   // ---- HANDLE: PROF. PICTURE FILE SELECTION ----
-  const handleAvatarFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setAvatarFile(file);
     setAvatarError(null);
@@ -141,6 +176,7 @@ const AccountProfilePage: React.FC = () => {
     try {
       const formData = new FormData();
       // jina la field liendane na backend yako (avatar)
+      // /api/auth/settings/ inakubali multipart/form-data
       formData.append("avatar", avatarFile);
 
       const res = await apiClient.patch<SettingsResponse>(
@@ -150,18 +186,21 @@ const AccountProfilePage: React.FC = () => {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
-      const newAvatar = res.data.avatar ?? null;
-      setAvatarUrl(newAvatar);
+      // Backend inarudisha avatar_url (full URL) + avatar (relative path)
+      const newAvatarUrl =
+        res.data.avatar_url || res.data.avatar || null;
+
+      setAvatarUrl(newAvatarUrl);
       setAvatarSuccess("Picha ya wasifu imebadilishwa kikamilifu.");
       setAvatarFile(null);
       setAvatarPreview(null);
     } catch (err) {
-      console.error(err);
+      console.error("Avatar upload failed:", err);
       setAvatarError(
-        "Imeshindikana kupakia picha ya wasifu. Hakikisha faili ni sahihi (jpg/png) kisha jaribu tena."
+        "Imeshindikana kupakia picha ya wasifu. Hakikisha faili ni sahihi (jpg/png) kisha jaribu tena.",
       );
     } finally {
       setSavingAvatar(false);
@@ -192,9 +231,9 @@ const AccountProfilePage: React.FC = () => {
 
       setProfileSuccess("Taarifa za akaunti zimehifadhiwa kikamilifu.");
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Save profile/settings failed:", err);
       setProfileError(
-        "Imeshindikana kuhifadhi taarifa za akaunti. Hakikisha taarifa ni sahihi kisha jaribu tena."
+        "Imeshindikana kuhifadhi taarifa za akaunti. Hakikisha taarifa ni sahihi kisha jaribu tena.",
       );
     } finally {
       setSavingProfile(false);
@@ -232,9 +271,9 @@ const AccountProfilePage: React.FC = () => {
       setNewPassword("");
       setNewPasswordConfirm("");
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Change password failed:", err);
       setPasswordError(
-        "Imeshindikana kubadili nenosiri. Hakikisha nenosiri la zamani ni sahihi."
+        "Imeshindikana kubadili nenosiri. Hakikisha nenosiri la zamani ni sahihi.",
       );
     } finally {
       setSavingPassword(false);
@@ -424,7 +463,7 @@ const AccountProfilePage: React.FC = () => {
                   </div>
                 </div>
 
-                <h2 className="text-sm font-semibold text-slate-900 dark:text:white pt-1">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white pt-1">
                   Preferences (lugha & muonekano)
                 </h2>
 

@@ -22,10 +22,36 @@ const ACCESS_KEY = "marketplace_access_token";
 const REFRESH_KEY = "marketplace_refresh_token";
 const USER_KEY = "marketplace_user";
 
-export function saveAuthData(data: AuthData) {
+// -------- GLOBAL LISTENERS (AuthContext & wengine wanaweza kusubscribe) --------
+
+type AuthListener = (payload: { user: User | null }) => void;
+
+const listeners = new Set<AuthListener>();
+
+function notifyAuthChange(user: User | null) {
+  listeners.forEach((listener) => {
+    try {
+      listener({ user });
+    } catch (err) {
+      console.error("Auth listener error:", err);
+    }
+  });
+}
+
+export function subscribeAuth(listener: AuthListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+// ---------------------- STORAGE HELPERS ----------------------
+
+export function saveAuthData(data: AuthData): void {
   localStorage.setItem(ACCESS_KEY, data.access);
   localStorage.setItem(REFRESH_KEY, data.refresh);
   localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  notifyAuthChange(data.user);
 }
 
 export function getAccessToken(): string | null {
@@ -39,6 +65,7 @@ export function getRefreshToken(): string | null {
 export function getUser(): User | null {
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
+
   try {
     return JSON.parse(raw) as User;
   } catch {
@@ -46,8 +73,9 @@ export function getUser(): User | null {
   }
 }
 
-export function clearAuthData() {
+export function clearAuthData(): void {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
+  notifyAuthChange(null);
 }

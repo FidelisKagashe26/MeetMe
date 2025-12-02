@@ -1,27 +1,51 @@
 // src/lib/apiClient.ts
-import axios from "axios";
+
+import axios, { AxiosError } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
+
 import {
   getAccessToken,
   getRefreshToken,
   saveAuthData,
   clearAuthData,
   getUser,
+  type AuthData,
 } from "./authStorage";
+import { startGlobalLoading, stopGlobalLoading } from "./loadingBus";
+
+const baseURL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
+  baseURL,
 });
 
-// Attach Authorization header automatically
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// =================== REQUEST INTERCEPTOR ===================
+apiClient.interceptors.request.use(
+  (config: ExtendedAxiosRequestConfig) => {
+    // washa global loader
+    startGlobalLoading();
 
-// Auto refresh token on 401 (if refresh token available)
+    const token = getAccessToken();
+    if (token) {
+      config.headers = config.headers ?? {};
+      (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error: unknown) => {
+    stopGlobalLoading();
+    return Promise.reject(error);
+  },
+);
+
+// =================== REFRESH TOKEN HELPERS ===================
+
 let isRefreshing = false;
 let failedQueue: {
   resolve: (value?: unknown) => void;
@@ -33,82 +57,102 @@ function processQueue(error: unknown, token: string | null = null) {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token || "");
+      prom.resolve(token ?? "");
     }
   });
   failedQueue = [];
 }
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+// =================== RESPONSE INTERCEPTOR ===================
 
-    // kama si 401 au tayari tumejaribu refresh, rudi error
-    if (
-      error.response?.status !== 401 ||
-      originalRequest._retry ||
-      !getRefreshToken()
-    ) {
+apiClient.interceptors.response.use(
+  (response) => {
+    stopGlobalLoading();
+    return response;
+  },
+  async (error: AxiosError) => {
+    stopGlobalLoading();
+
+    const originalRequest = error.config as ExtendedAxiosRequestConfig | undefined;
+
+    if (!originalRequest || !error.response) {
       return Promise.reject(error);
     }
 
+    const status = error.response.status;
+
+    // sio 401, au tayari tumeshajaribu refresh, au hakuna refresh token => rudi error kama ilivyo
+    if (status !== 401 || originalRequest._retry || !getRefreshToken()) {
+      return Promise.reject(error);
+    }
+
+    // kama kuna process ya refresh inaendelea, weka kwenye foleni
     if (isRefreshing) {
-      // subcribe kwenye queue hadi refresh imalizike
       return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
       })
         .then((token) => {
-          if (originalRequest.headers && typeof token === "string") {
+          if (
+            originalRequest.headers &&
+            typeof token === "string" &&
+            token.trim()
+          ) {
             originalRequest.headers.Authorization = `Bearer ${token}`;
           }
           return apiClient(originalRequest);
         })
-        .catch(Promise.reject);
+        .catch((queueError) => Promise.reject(queueError));
     }
 
+    // Anza mzunguko mpya wa refresh
     originalRequest._retry = true;
     isRefreshing = true;
 
     try {
       const refreshToken = getRefreshToken();
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/api/auth/jwt/refresh/`,
-        { refresh: refreshToken }
+
+      const refreshResponse = await axios.post(
+        `${baseURL}/api/auth/jwt/refresh/`,
+        { refresh: refreshToken },
       );
 
-      const newAccess = response.data.access as string;
+      const data = refreshResponse.data as { access: string };
+      const newAccess = data.access;
       const user = getUser();
 
       if (!user) {
-        // hatuna user, basi toka tu
+        // hatuna user kwenye storage – safisha kila kitu
         clearAuthData();
         processQueue(null, null);
         isRefreshing = false;
         return Promise.reject(error);
       }
 
-      saveAuthData({
+      const newAuth: AuthData = {
         access: newAccess,
-        refresh: refreshToken || "",
+        refresh: refreshToken ?? "",
         user,
-      });
+      };
 
+      // hifadhi access mpya (na kuwajulisha listeners – AuthContext n.k.)
+      saveAuthData(newAuth);
+
+      // rudisha token mpya kwa zilizo-subscribe kwenye foleni
       processQueue(null, newAccess);
       isRefreshing = false;
 
-      if (originalRequest.headers) {
-        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
-      }
+      originalRequest.headers = originalRequest.headers ?? {};
+      originalRequest.headers.Authorization = `Bearer ${newAccess}`;
 
       return apiClient(originalRequest);
     } catch (refreshError) {
+      // refresh imeshindikana: clear auth, notify, na toa error
       clearAuthData();
       processQueue(refreshError, null);
       isRefreshing = false;
       return Promise.reject(refreshError);
     }
-  }
+  },
 );
 
 export default apiClient;

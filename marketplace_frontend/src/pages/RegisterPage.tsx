@@ -4,12 +4,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import axios from "axios";
 
 const RegisterPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { register, loading: authLoading } = useAuth();
+  const { language } = useLanguage();
+  const isSw = language === "sw";
 
   const searchParams = new URLSearchParams(location.search);
   const nextParam = searchParams.get("next") || "/";
@@ -29,12 +32,20 @@ const RegisterPage: React.FC = () => {
     setError(null);
 
     if (password !== passwordConfirm) {
-      setError("Nenosiri hazilingani. Hakikisha yamefanana.");
+      setError(
+        isSw
+          ? "Nenosiri hazilingani. Hakikisha yamefanana."
+          : "Passwords do not match. Please make sure they are the same."
+      );
       return;
     }
 
     if (!email.trim()) {
-      setError("Email ni lazima. Tafadhali weka barua pepe sahihi.");
+      setError(
+        isSw
+          ? "Email ni lazima. Tafadhali weka barua pepe sahihi."
+          : "Email is required. Please enter a valid email address."
+      );
       return;
     }
 
@@ -48,7 +59,9 @@ const RegisterPage: React.FC = () => {
 
     if (!finalUsername) {
       setError(
-        "Username ni lazima. Andika username au tutaokota moja kutoka kwenye email."
+        isSw
+          ? "Username ni lazima. Andika username au tutaokota moja kutoka kwenye email."
+          : "Username is required. Write a username or we will pick one from your email."
       );
       setSubmitting(false);
       return;
@@ -83,17 +96,31 @@ const RegisterPage: React.FC = () => {
               setError(value);
             } else {
               setError(
-                "Imeshindikana kuunda akaunti. Hakikisha taarifa ulizoweka ni sahihi."
+                isSw
+                  ? "Imeshindikana kuunda akaunti. Hakikisha taarifa ulizoweka ni sahihi."
+                  : "Failed to create the account. Please make sure the information you entered is correct."
               );
             }
           } else {
-            setError("Imeshindikana kuunda akaunti. Tafadhali jaribu tena.");
+            setError(
+              isSw
+                ? "Imeshindikana kuunda akaunti. Tafadhali jaribu tena."
+                : "Failed to create the account. Please try again."
+            );
           }
         } else {
-          setError("Imeshindikana kuunda akaunti. Tafadhali jaribu tena.");
+          setError(
+            isSw
+              ? "Imeshindikana kuunda akaunti. Tafadhali jaribu tena."
+              : "Failed to create the account. Please try again."
+          );
         }
       } else {
-        setError("Kuna hitilafu ya ndani ya mfumo. Jaribu tena baadae.");
+        setError(
+          isSw
+            ? "Kuna hitilafu ya ndani ya mfumo. Jaribu tena baadae."
+            : "There was an internal system error. Please try again later."
+        );
       }
     } finally {
       setSubmitting(false);
@@ -110,12 +137,14 @@ const RegisterPage: React.FC = () => {
         <div className="w-full max-w-md">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-              Create your LINKA account
+              {isSw
+                ? "Fungua akaunti yako ya LINKA"
+                : "Create your LINKA account"}
             </h1>
             <p className="text-[12px] text-slate-500 dark:text-slate-400 mb-4">
-              Akaunti inakusaidia kununua na kuuza bidhaa kwa usalama.
-              Tutatumia email yako kwa login na taarifa muhimu kama kubadilisha
-              nenosiri.
+              {isSw
+                ? "Akaunti inakusaidia kununua na kuuza bidhaa kwa usalama. Tutatumia email yako kwa login na taarifa muhimu kama kubadilisha nenosiri."
+                : "Your account helps you buy and sell products safely. We'll use your email for login and important updates such as password reset."}
             </p>
 
             {error && (
@@ -127,7 +156,7 @@ const RegisterPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
-                  Username
+                  {isSw ? "Username" : "Username"}
                 </label>
                 <input
                   type="text"
@@ -137,15 +166,16 @@ const RegisterPage: React.FC = () => {
                   placeholder="your-username"
                 />
                 <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
-                  Ukiacha tupu, tutaokota username kutoka kwenye email yako
-                  (kabla ya @).
+                  {isSw
+                    ? "Ukiacha tupu, tutaokota username kutoka kwenye email yako (kabla ya @)."
+                    : "If you leave this empty, we will pick a username from your email (before the @)."}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
-                    Email
+                    {isSw ? "Email" : "Email"}
                   </label>
                   <input
                     type="email"
@@ -159,26 +189,30 @@ const RegisterPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
-                      First name (optional)
+                      {isSw
+                        ? "Jina la kwanza (hiari)"
+                        : "First name (optional)"}
                     </label>
                     <input
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
-                      placeholder="John"
+                      placeholder={isSw ? "John" : "John"}
                     />
                   </div>
                   <div>
                     <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
-                      Last name (optional)
+                      {isSw
+                        ? "Jina la ukoo (hiari)"
+                        : "Last name (optional)"}
                     </label>
                     <input
                       type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500"
-                      placeholder="Doe"
+                      placeholder={isSw ? "Doe" : "Doe"}
                     />
                   </div>
                 </div>
@@ -186,7 +220,7 @@ const RegisterPage: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
-                  Password
+                  {isSw ? "Nenosiri" : "Password"}
                 </label>
                 <input
                   type="password"
@@ -201,7 +235,7 @@ const RegisterPage: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] text-slate-600 dark:text-slate-300 mb-1">
-                  Confirm password
+                  {isSw ? "Thibitisha nenosiri" : "Confirm password"}
                 </label>
                 <input
                   type="password"
@@ -219,17 +253,25 @@ const RegisterPage: React.FC = () => {
                 disabled={disabled}
                 className="w-full mt-1 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
               >
-                {disabled ? "Creating account..." : "Create account"}
+                {disabled
+                  ? isSw
+                    ? "Tunaunda akaunti..."
+                    : "Creating account..."
+                  : isSw
+                  ? "Fungua akaunti"
+                  : "Create account"}
               </button>
             </form>
 
             <div className="mt-4 text-[11px] text-slate-500 dark:text-slate-400">
-              Already have an account?{" "}
+              {isSw
+                ? "Tayari una akaunti?"
+                : "Already have an account?"}{" "}
               <Link
                 to={`/login?next=${encodeURIComponent(nextParam)}`}
                 className="text-orange-600 hover:underline font-medium"
               >
-                Sign in
+                {isSw ? "Ingia" : "Sign in"}
               </Link>
             </div>
           </div>

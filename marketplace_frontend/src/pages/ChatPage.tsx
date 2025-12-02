@@ -1,4 +1,5 @@
 // src/pages/ChatPage.tsx
+
 import React, {
   useCallback,
   useEffect,
@@ -8,6 +9,7 @@ import React, {
 import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import apiClient from "../lib/apiClient";
+import { getAccessToken } from "../lib/authStorage";
 import { useAuth } from "../contexts/AuthContext";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
@@ -58,6 +60,29 @@ interface ProductMini {
   units_sold?: number;
 }
 
+interface ConversationParticipantStateBase {
+  id?: number;
+  conversation: number;
+  is_typing: boolean;
+  last_typing_at: string | null;
+  last_seen_at: string | null;
+  last_read_at: string | null;
+}
+
+interface ConversationParticipantStateWithUser
+  extends ConversationParticipantStateBase {
+  user: UserMini;
+}
+
+interface ConversationParticipantStateWithUserId
+  extends ConversationParticipantStateBase {
+  user_id: number;
+}
+
+type ConversationParticipantState =
+  | ConversationParticipantStateWithUser
+  | ConversationParticipantStateWithUserId;
+
 interface Conversation {
   id: number;
   buyer: UserMini;
@@ -68,16 +93,6 @@ interface Conversation {
   last_message: Message;
   unread_count: number;
   is_typing_other_side: boolean;
-}
-
-interface ConversationParticipantState {
-  id: number;
-  conversation: number;
-  user: UserMini;
-  is_typing: boolean;
-  last_typing_at: string | null;
-  last_seen_at: string | null;
-  last_read_at: string | null;
 }
 
 interface ConversationDetail extends Conversation {
@@ -127,6 +142,45 @@ const getProductMainImage = (product: ProductMini | null): string | null => {
   return null;
 };
 
+const getParticipantUserId = (
+  ps: ConversationParticipantState,
+): number | null => {
+  if ("user" in ps && ps.user) {
+    return ps.user.id;
+  }
+  if ("user_id" in ps && typeof ps.user_id === "number") {
+    return ps.user_id;
+  }
+  return null;
+};
+
+// ------------------ WS EVENT TYPES ------------------
+
+type WsEventBase = {
+  type?: string;
+};
+
+interface WsMessageEnvelope extends WsEventBase {
+  message: Message;
+}
+
+interface WsTypingEnvelope extends WsEventBase {
+  state: ConversationParticipantState;
+}
+
+interface WsBulkEnvelope extends WsEventBase {
+  type: "conversation.bulk_state";
+  messages?: Message[];
+  participant_states?: ConversationParticipantState[];
+}
+
+type WsEventPayload =
+  | WsMessageEnvelope
+  | WsTypingEnvelope
+  | WsBulkEnvelope;
+
+// ------------------ BUILD WEBSOCKET URL ------------------
+
 const buildWebSocketUrl = (conversationPk: number): string => {
   const base =
     (apiClient.defaults.baseURL as string | undefined) ||
@@ -144,15 +198,43 @@ const buildWebSocketUrl = (conversationPk: number): string => {
 
   url.pathname = `/ws/chat/${conversationPk}/`;
 
-  const token =
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("access") ||
-    localStorage.getItem("token");
+  let token: string | null = null;
 
-  if (token) url.searchParams.set("token", token);
+  // 1) Jaribu kuchukua moja kwa moja kutoka Authorization header ya apiClient
+  const maybeHeaders = apiClient.defaults.headers?.common;
+  if (maybeHeaders) {
+    const headersRecord = maybeHeaders as Record<string, unknown>;
+    const authHeader =
+      (headersRecord.Authorization as string | undefined) ??
+      (headersRecord.authorization as string | undefined);
+
+    if (authHeader && typeof authHeader === "string") {
+      const lower = authHeader.toLowerCase();
+      if (lower.startsWith("bearer ")) {
+        token = authHeader.slice(7).trim();
+      }
+    }
+  }
+
+  // 2) Fallback: tumia getAccessToken (storage)
+  if (!token) {
+    token = getAccessToken();
+  }
+
+  if (token) {
+    url.searchParams.set("token", token);
+  } else {
+    console.warn(
+      "[Chat WS] Hakuna JWT token iliyopatikana kwa WebSocket (Authorization/header/storage).",
+    );
+  }
+
+  console.log("[Chat WS] Final URL:", url.toString());
 
   return url.toString();
 };
+
+// ========================================================
 
 const ChatPage: React.FC = () => {
   const { user } = useAuth();
@@ -161,7 +243,7 @@ const ChatPage: React.FC = () => {
   const productIdParam = searchParams.get("product");
   const sellerIdParam = searchParams.get("seller");
   const conversationParam = searchParams.get("conversation");
-  const orderIdParam = searchParams.get("order"); // future use
+  const orderIdParam = searchParams.get("order"); // reserve, future use
 
   const conversationFromUrl =
     conversationParam !== null && !Number.isNaN(Number(conversationParam))
@@ -184,9 +266,9 @@ const ChatPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState<string>("");
 
-  // Fallback context wakati bado hatujapata conversation
+  // Fallback context kabla hatujapata ConversationDetail
   const [fallbackProduct, setFallbackProduct] = useState<ProductMini | null>(
-    null
+    null,
   );
   const [fallbackSeller, setFallbackSeller] = useState<SellerMini | null>(null);
 
@@ -214,14 +296,14 @@ const ChatPage: React.FC = () => {
     }
   }, []);
 
-  const shopName =
-    effectiveSeller?.business_name ?? "Seller shop";
-
+  const shopName = effectiveSeller?.business_name ?? "Seller shop";
   const productImage = getProductMainImage(effectiveProduct);
 
-  const otherTyping = participantStates.some(
-    (ps) => ps.user.id !== user?.id && ps.is_typing
-  );
+  const otherTyping = participantStates.some((ps) => {
+    const participantId = getParticipantUserId(ps);
+    if (!user || participantId === null) return false;
+    return participantId !== user.id && ps.is_typing;
+  });
 
   const formatDateTimeShort = (iso: string) => {
     if (!iso) return "";
@@ -247,39 +329,46 @@ const ChatPage: React.FC = () => {
 
   const renderStatusTick = (status: MessageStatus, mine: boolean) => {
     if (!mine) return null;
-    if (status === "sent")
+    if (status === "sent") {
       return <span className="ml-1 text-[9px] opacity-80">✓</span>;
-    if (status === "delivered")
+    }
+    if (status === "delivered") {
       return <span className="ml-1 text-[9px] opacity-80">✓✓</span>;
-    if (status === "read")
+    }
+    if (status === "read") {
       return (
         <span className="ml-1 text-[9px] opacity-80 text-emerald-300">
           ✓✓
         </span>
       );
+    }
     return null;
   };
 
-  // ================== REST REFRESH ==================
-  const refreshConversation = useCallback(
+  // ================== INITIAL CONVERSATION DETAIL (ONE-TIME REST) ==================
+  const [initialDetailLoaded, setInitialDetailLoaded] = useState(false);
+
+  const loadConversationDetail = useCallback(
     async (conversationPk: number) => {
       setLoading(true);
       setError(null);
       try {
         const res = await apiClient.get<ConversationDetail>(
-          `/api/conversations/${conversationPk}/`
+          `/api/conversations/${conversationPk}/`,
         );
         const data = res.data;
         setConversationDetail(data);
         setMessages(data.messages || []);
         setParticipantStates(data.participant_states || []);
 
-        // mark all as seen (non blocking)
+        // mark all as seen (non-blocking)
         void apiClient
           .post(`/api/conversations/${conversationPk}/mark_seen/`, {})
           .catch((markError) => {
             console.error("Failed to mark messages as seen", markError);
           });
+
+        setInitialDetailLoaded(true);
       } catch (err) {
         console.error(err);
         setError("Imeshindikana kupakia messages. Jaribu tena baadae.");
@@ -287,20 +376,22 @@ const ChatPage: React.FC = () => {
         setLoading(false);
       }
     },
-    []
+    [],
   );
 
   // ================== HANDLE WS EVENTS ==================
   const handleIncomingEvent = useCallback(
     (event: MessageEvent<string>) => {
       try {
-        const dataRaw = JSON.parse(event.data) as Record<string, unknown>;
-        if (!dataRaw || typeof dataRaw !== "object") return;
+        console.log("[WS raw event]", event.data);
+        const parsed = JSON.parse(event.data) as WsEventPayload | null;
+        if (!parsed || typeof parsed !== "object") return;
 
-        const type = dataRaw.type as string | undefined;
+        const type = parsed.type;
 
-        if (type === "message.created" && dataRaw.message) {
-          const incoming = dataRaw.message as Message;
+        // ----- SINGLE MESSAGE (created/updated) -----
+        if ("message" in parsed && parsed.message) {
+          const incoming = parsed.message;
 
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === incoming.id);
@@ -317,49 +408,78 @@ const ChatPage: React.FC = () => {
                   last_message: incoming,
                   last_message_at: incoming.created_at,
                 }
-              : prev
+              : prev,
           );
 
           if (user && incoming.sender.id !== user.id && conversationId) {
             void apiClient
               .post(`/api/conversations/${conversationId}/mark_seen/`, {})
-              .catch((err) =>
-                console.error("Failed to mark seen via websocket event", err)
-              );
+              .catch((err) => {
+                console.error(
+                  "Failed to mark seen via websocket event",
+                  err,
+                );
+              });
           }
 
           scrollToBottom();
           return;
         }
 
-        if (type === "message.updated" && dataRaw.message) {
-          const updated = dataRaw.message as Message;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === updated.id ? updated : m))
-          );
-          return;
-        }
+        // ----- TYPING STATE (conversation.typing) -----
+        const looksLikeTypingEvent =
+          typeof type === "string" &&
+          type.toLowerCase().includes("typing") &&
+          "state" in parsed;
 
-        if (type === "conversation.typing" && dataRaw.state) {
-          const state = dataRaw.state as ConversationParticipantState;
+        if (looksLikeTypingEvent && "state" in parsed && parsed.state) {
+          const state = parsed.state;
+
           setParticipantStates((prev) => {
-            const idx = prev.findIndex((ps) => ps.id === state.id);
-            if (idx === -1) return [...prev, state];
-            const clone = [...prev];
-            clone[idx] = state;
-            return clone;
+            const existingIndex = prev.findIndex(
+              (ps) =>
+                ps.id !== undefined &&
+                state.id !== undefined &&
+                ps.id === state.id,
+            );
+
+            if (existingIndex !== -1) {
+              const clone = [...prev];
+              clone[existingIndex] = state;
+              return clone;
+            }
+
+            const incomingUserId = getParticipantUserId(state);
+            const idxByUser = prev.findIndex((ps) => {
+              const uid = getParticipantUserId(ps);
+              return (
+                uid !== null &&
+                incomingUserId !== null &&
+                uid === incomingUserId &&
+                ps.conversation === state.conversation
+              );
+            });
+
+            if (idxByUser !== -1) {
+              const clone = [...prev];
+              clone[idxByUser] = state;
+              return clone;
+            }
+
+            return [...prev, state];
           });
+
           return;
         }
 
+        // ----- BULK SNAPSHOT -----
         if (type === "conversation.bulk_state") {
-          if (Array.isArray(dataRaw.messages)) {
-            setMessages(dataRaw.messages as Message[]);
+          const bulk = parsed as WsBulkEnvelope;
+          if (bulk.messages) {
+            setMessages(bulk.messages);
           }
-          if (Array.isArray(dataRaw.participant_states)) {
-            setParticipantStates(
-              dataRaw.participant_states as ConversationParticipantState[]
-            );
+          if (bulk.participant_states) {
+            setParticipantStates(bulk.participant_states);
           }
           scrollToBottom();
         }
@@ -367,10 +487,10 @@ const ChatPage: React.FC = () => {
         console.error("Failed to parse WS message", err);
       }
     },
-    [conversationId, scrollToBottom, user]
+    [conversationId, scrollToBottom, user],
   );
 
-  // ================== BOOTSTRAP CONVERSATION ==================
+  // ================== BOOTSTRAP CONVERSATION (CREATE/REUSE) ==================
   useEffect(() => {
     if (!user) return;
     if (hasBootstrapped) return;
@@ -396,7 +516,7 @@ const ChatPage: React.FC = () => {
         // 3) Otherwise, jaribu ku-create kwa seller + product
         if (!sellerIdParam) {
           setError(
-            "Haijabainika muuzaji wa hii chat. Tafadhali fungua chat kupitia product."
+            "Haijabainika muuzaji wa hii chat. Tafadhali fungua chat kupitia product.",
           );
           setLoading(false);
           setHasBootstrapped(true);
@@ -414,12 +534,11 @@ const ChatPage: React.FC = () => {
           }
         }
 
-        // orderIdParam unaweza kuitumia baadaye upande wa backend bila kubadilisha hapa
-        void orderIdParam;
+        void orderIdParam; // reserved for future use
 
         const res = await apiClient.post<Conversation>(
           "/api/conversations/",
-          payload
+          payload,
         );
         setConversationId(res.data.id);
       } catch (errorInit: unknown) {
@@ -462,12 +581,14 @@ const ChatPage: React.FC = () => {
     orderIdParam,
   ]);
 
-  // ================== LOAD CONVERSATION DETAIL ==================
+  // ================== LOAD CONVERSATION DETAIL (ONE TIME) ==================
   useEffect(() => {
     if (!user) return;
     if (!conversationId) return;
-    void refreshConversation(conversationId);
-  }, [user, conversationId, refreshConversation]);
+    if (initialDetailLoaded) return;
+
+    void loadConversationDetail(conversationId);
+  }, [user, conversationId, initialDetailLoaded, loadConversationDetail]);
 
   // ================== FALLBACK CONTEXT (product / seller) ==================
   useEffect(() => {
@@ -479,7 +600,7 @@ const ChatPage: React.FC = () => {
           const productPk = Number(productIdParam);
           if (!Number.isNaN(productPk)) {
             const prodRes = await apiClient.get<ProductMini>(
-              `/api/products/${productPk}/`
+              `/api/products/${productPk}/`,
             );
             setFallbackProduct(prodRes.data);
           }
@@ -489,7 +610,7 @@ const ChatPage: React.FC = () => {
           const sellerPk = Number(sellerIdParam);
           if (!Number.isNaN(sellerPk)) {
             const sellerRes = await apiClient.get<SellerMini>(
-              `/api/sellers/${sellerPk}/`
+              `/api/sellers/${sellerPk}/`,
             );
             setFallbackSeller(sellerRes.data);
           }
@@ -508,17 +629,19 @@ const ChatPage: React.FC = () => {
     if (!conversationId) return;
 
     const url = buildWebSocketUrl(conversationId);
+    console.log("[WS] connecting to", url);
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log("[WS] connected");
       setWsConnected(true);
       try {
         ws.send(
           JSON.stringify({
             action: "join",
             conversation: conversationId,
-          })
+          }),
         );
       } catch (err) {
         console.error("Failed to send join event", err);
@@ -534,11 +657,13 @@ const ChatPage: React.FC = () => {
     };
 
     ws.onclose = () => {
+      console.log("[WS] closed");
       setWsConnected(false);
       wsRef.current = null;
     };
 
     return () => {
+      console.log("[WS] cleanup - closing");
       ws.close();
       wsRef.current = null;
       if (typingTimeoutRef.current) {
@@ -556,26 +681,40 @@ const ChatPage: React.FC = () => {
     }
   }, [messages.length, scrollToBottom]);
 
-  // ================== TYPING ==================
+  // ================== TYPING (WS with HTTP fallback) ==================
   const sendTyping = useCallback(
     (typing: boolean) => {
-      if (!wsRef.current) return;
-      try {
-        wsRef.current.send(
-          JSON.stringify({
-            action: "typing",
-            is_typing: typing,
-            conversation: conversationId,
-          })
-        );
-      } catch (err) {
-        console.error("Failed to send typing event", err);
+      if (!conversationId) return;
+
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(
+            JSON.stringify({
+              type: "typing",
+              is_typing: typing,
+            }),
+          );
+          return;
+        } catch (err) {
+          console.error("Failed to send typing over WS", err);
+        }
       }
+
+      void apiClient
+        .post(`/api/conversations/${conversationId}/typing/`, {
+          is_typing: typing,
+        })
+        .catch((err) => {
+          console.error("Failed to send typing state (HTTP fallback)", err);
+        });
     },
-    [conversationId]
+    [conversationId],
   );
 
-  const handleChangeMessage = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChangeMessage = (
+    e: React.ChangeEvent<HTMLTextAreaElement>,
+  ) => {
     const value = e.target.value;
     setNewMessage(value);
 
@@ -613,7 +752,7 @@ const ChatPage: React.FC = () => {
 
     if (!conversationId) {
       setError(
-        "Hatukuweza kutambua mazungumzo. Tafadhali fungua chat tena kupitia product."
+        "Hatukuweza kutambua mazungumzo. Tafadhali fungua chat tena kupitia product.",
       );
       return;
     }
@@ -630,20 +769,15 @@ const ChatPage: React.FC = () => {
       const res = await apiClient.post<Message>("/api/messages/", payload);
       setNewMessage("");
 
-      // optimistic add (ikiwa WS haijaja bado au imechelewa)
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === res.data.id);
         if (exists) return prev;
         return [...prev, res.data];
       });
-
-      if (!wsConnected) {
-        await refreshConversation(conversationId);
-      }
     } catch (errorSend) {
       console.error(errorSend);
       setError(
-        "Imeshindikana kutuma ujumbe. Hakikisha uko online na jaribu tena."
+        "Imeshindikana kutuma ujumbe. Hakikisha uko online na jaribu tena.",
       );
     } finally {
       setSending(false);
@@ -669,14 +803,29 @@ const ChatPage: React.FC = () => {
       <MainHeader />
 
       <main className="flex-1 max-w-3xl mx-auto px-4 py-5 flex flex-col gap-3">
-        <header className="mb-1">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-            Chat with seller
-          </h1>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Tuma ujumbe kwa muuzaji kujadiliana kuhusu product na details za
-            miamala kwa muda halisi (real-time).
-          </p>
+        <header className="mb-1 flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Chat with seller
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Tuma ujumbe kwa muuzaji kujadiliana kuhusu product na details za
+              miamala kwa muda halisi (real-time).
+            </p>
+          </div>
+
+          <div className="text-[10px] px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/70">
+            WS:{" "}
+            <span
+              className={
+                wsConnected
+                  ? "text-emerald-600 dark:text-emerald-300 font-semibold"
+                  : "text-red-500 font-semibold"
+              }
+            >
+              {wsConnected ? "connected" : "disconnected"}
+            </span>
+          </div>
         </header>
 
         <section className="flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -768,14 +917,14 @@ const ChatPage: React.FC = () => {
 
             {otherTyping && (
               <div className="px-1 pt-1 text-[11px] text-slate-500 italic">
-                Muuzaji anaandika...
+                Typing....
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
 
-          {/* PINNED PRODUCT (WhatsApp style) */}
+          {/* PINNED PRODUCT */}
           {effectiveProduct && (
             <div className="border-t border-slate-200 dark:border-slate-800 px-3 py-2 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
               {productImage ? (

@@ -1,5 +1,11 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useState } from "react";
+
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import apiClient from "../lib/apiClient";
 import type { AuthData, User } from "../lib/authStorage";
 import {
@@ -7,6 +13,7 @@ import {
   getUser,
   clearAuthData,
   getRefreshToken,
+  subscribeAuth,
 } from "../lib/authStorage";
 
 interface LoginPayload {
@@ -40,39 +47,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // initial load from localStorage
+  // Initial bootstrap + kusikiliza mabadiliko ya auth (login / logout / token clear)
   useEffect(() => {
     const storedUser = getUser();
     if (storedUser) {
       setUser(storedUser);
     }
     setLoading(false);
+
+    const unsubscribe = subscribeAuth(({ user: nextUser }) => {
+      setUser(nextUser);
+    });
+
+    return unsubscribe;
   }, []);
 
-  const login = async (data: LoginPayload) => {
+  const login = async (data: LoginPayload): Promise<void> => {
     const res = await apiClient.post<AuthData>("/api/auth/login/", data);
+    // hifadhi tokens + user, na itatrigger subscribeAuth -> setUser
     saveAuthData(res.data);
-    setUser(res.data.user);
   };
 
-  const register = async (data: RegisterPayload) => {
+  const register = async (data: RegisterPayload): Promise<void> => {
     const res = await apiClient.post<AuthData>("/api/auth/register/", data);
     saveAuthData(res.data);
-    setUser(res.data.user);
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
       const refresh = getRefreshToken();
       if (refresh) {
         await apiClient.post("/api/auth/logout/", { refresh });
       }
     } catch (err) {
-      // hata kama logout imefail server, tutaclear client anyway
+      // hata kama server imeshindwa, client tuta-cleara tu
       console.error("Logout error", err);
     } finally {
       clearAuthData();
-      setUser(null);
     }
   };
 
