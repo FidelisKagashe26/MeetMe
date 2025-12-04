@@ -1,4 +1,5 @@
 // src/pages/SellerProfilePage.tsx
+
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -8,6 +9,10 @@ import { useLanguage } from "../contexts/LanguageContext";
 import GoogleMapPreview, { type LatLng } from "../components/GoogleMapPreview";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
+
+// Phone input ya mataifa yote
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
 
 // -------------------- TYPES --------------------
 
@@ -397,14 +402,61 @@ const SellerProfilePage: React.FC = () => {
     user?.username?.charAt(0)?.toUpperCase() ||
     "";
 
+  /**
+   * SUBMIT HANDLER:
+   * - Step 1 (profile): HAITUMI DB. Ina-validate na kukusogeza "location" tu.
+   * - Step 2 (location): Hapo ndipo tunatuma profile + location (na logo/shop_image) backend.
+   */
   const handleSubmitProfileOrLocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError(null);
     setSuccess(null);
 
+    // ---------- STEP 1: PROFILE ONLY (NO API) ----------
+    if (activeStep === "profile") {
+      if (!form.business_name.trim()) {
+        setError(
+          isSw
+            ? "Tafadhali weka jina la biashara kabla ya kuendelea."
+            : "Please enter your business name before continuing.",
+        );
+        return;
+      }
+
+      setCompleted((prev) => ({
+        ...prev,
+        profile: true,
+      }));
+
+      setActiveStep("location");
+      setSuccess(
+        isSw
+          ? "Hatua ya kwanza imekamilika. Sasa jaza taarifa za location ya duka."
+          : "Step 1 completed. Now fill your shop location details.",
+      );
+      return;
+    }
+
+    // Kama si "location" hapa, hakuna cha kufanya kwa submit
+    if (activeStep !== "location") {
+      return;
+    }
+
+    // ---------- STEP 2: LOCATION + PROFILE -> TUMA BACKEND ----------
+    // Hakikisha bado tuna business_name (kama mtu ameruka moja kwa moja kwenda step 2)
+    if (!form.business_name.trim()) {
+      setError(
+        isSw
+          ? "Tafadhali jaza kwanza jina la biashara kwenye hatua ya kwanza."
+          : "Please fill your business name in the first step before saving.",
+      );
+      setActiveStep("profile");
+      return;
+    }
+
+    setSaving(true);
+
     try {
-      // ⚠️ HATUTUMI TENa logo/shop_image KAMA STRING KWENYE JSON
       const payload: SellerProfilePayload = {
         business_name: form.business_name,
         description: form.description,
@@ -441,7 +493,7 @@ const SellerProfilePage: React.FC = () => {
 
       let finalSeller: SellerProfileResponse = baseSeller;
 
-      // ✅ PATCH LOGO file (multipart/form-data)
+      // ✅ PATCH LOGO file (multipart/form-data) kama user kachagua
       if (logoFile) {
         try {
           const fd = new FormData();
@@ -524,23 +576,14 @@ const SellerProfilePage: React.FC = () => {
         void loadMyProducts(finalSeller.id);
       }
 
-      const msg =
-        activeStep === "profile"
-          ? isSw
-            ? "Wasifu wa muuzaji umehifadhiwa."
-            : "Seller profile updated."
-          : isSw
-          ? "Location ya duka imehifadhiwa."
-          : "Shop location updated.";
+      const msg = isSw
+        ? "Wasifu wa muuzaji na location vimehifadhiwa kikamilifu."
+        : "Seller profile and location have been saved successfully.";
 
       setSuccess(msg);
 
-      // move to step inayofuata
-      if (activeStep === "profile") {
-        setActiveStep("location");
-      } else if (activeStep === "location") {
-        setActiveStep("products");
-      }
+      // Baada ya hatua ya pili, peleka user hatua ya tatu (optional products)
+      setActiveStep("products");
     } catch (err) {
       console.error(err);
       setError(
@@ -755,13 +798,33 @@ const SellerProfilePage: React.FC = () => {
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
                           {isSw ? "Namba ya simu" : "Phone number"}
                         </label>
-                        <input
-                          name="phone_number"
-                          value={form.phone_number}
-                          onChange={handleChange}
-                          className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs md:text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                          placeholder="+2557..."
-                        />
+                        <div className="w-full">
+                          <PhoneInput
+                            country="tz" // default Tanzania
+                            value={form.phone_number}
+                            onChange={(value) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                phone_number: value || "",
+                              }))
+                            }
+                            enableSearch
+                            inputProps={{
+                              name: "phone_number",
+                              id: "phone_number",
+                              autoComplete: "tel",
+                            }}
+                            containerClass="w-full"
+                            inputClass="!w-full !text-xs md:!text-sm !bg-white dark:!bg-slate-900 !text-slate-900 dark:!text-slate-100 !border !border-slate-200 dark:!border-slate-700 !rounded-xl !px-3 !py-2 focus:!outline-none focus:!ring-2 focus:!ring-orange-500 focus:!border-orange-500"
+                            buttonClass="!bg-white dark:!bg-slate-900 !border-slate-200 dark:!border-slate-700"
+                            dropdownClass="!bg-white dark:!bg-slate-900 !text-slate-900 dark:!text-slate-100"
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                          {isSw
+                            ? "Unaweza kuchagua namba ya nchi yoyote, lakini default ni Tanzania."
+                            : "You can choose any country's phone number, but the default is Tanzania."}
+                        </p>
                       </div>
                     </div>
 
@@ -1028,8 +1091,8 @@ const SellerProfilePage: React.FC = () => {
                         ? "Hifadhi na nenda hatua inayofuata"
                         : "Save & go to next step"
                       : isSw
-                      ? "Hifadhi location (unaweza kuruka bidhaa)"
-                      : "Save location (you can skip products)"}
+                      ? "Hifadhi wasifu + location"
+                      : "Save profile + location"}
                   </button>
                 </div>
               </form>

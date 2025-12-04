@@ -1,14 +1,17 @@
 // src/components/MainHeader.tsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../lib/apiClient";
 import { useTheme } from "../contexts/ThemeContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { FiSun, FiMoon } from "react-icons/fi";
+import { FiSun } from "react-icons/fi";
+import { FiMoon } from "react-icons/fi";
 import { LuMonitor } from "react-icons/lu";
-import { mapBackendThemeToMode, mapThemeModeToBackend } from "../types/theme";
-import type { ThemeMode, BackendTheme, } from "../types/theme";
+import { mapBackendThemeToMode } from "../types/theme";
+import type { ThemeMode, BackendTheme } from "../types/theme";
+import { THEME_STORAGE_KEY } from "../constants/theme";
 
 interface ProfileSettings {
   is_seller: boolean;
@@ -58,20 +61,35 @@ const MainHeader: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
-  const [profileSettings, setProfileSettings] = useState<ProfileSettings | null>(null);
-  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
+  const [profileSettings, setProfileSettings] =
+    useState<ProfileSettings | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!user) {
       setProfileSettings(null);
       setSellerProfile(null);
       setUnreadCount(0);
-      
-      // For non-logged in users, use localStorage
-      const storedTheme = localStorage.getItem("app_theme_mode") as ThemeMode | null;
+
+      // For non-logged in users, tumia preference ya localStorage
+      const storedTheme = localStorage.getItem(
+        THEME_STORAGE_KEY,
+      ) as ThemeMode | null;
       if (storedTheme && storedTheme !== mode) {
         setMode(storedTheme);
       }
+
+      // Lugha pia tunaweza kuisoma kwenye localStorage kama umeihifadhi huko
+      const storedLanguage = localStorage.getItem("app_language");
+      if (
+        storedLanguage === "en" ||
+        storedLanguage === "sw"
+      ) {
+        setLanguage(storedLanguage);
+      }
+
       return;
     }
 
@@ -86,22 +104,38 @@ const MainHeader: React.FC = () => {
           const data = settingsRes.value.data;
           setProfileSettings(data);
 
-          // Sync language
-          if (data.preferred_language && data.preferred_language !== language) {
+          // Sync language from backend ON LOGIN (preference ya profile)
+          if (
+            data.preferred_language &&
+            data.preferred_language !== language
+          ) {
             setLanguage(data.preferred_language);
+
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem(
+                "app_language",
+                data.preferred_language,
+              );
+            }
           }
 
-          // Sync theme - CRITICAL: Apply backend theme IMMEDIATELY
+          // Sync theme from backend ON LOGIN (preference ya profile)
           if (data.theme) {
             const newMode = mapBackendThemeToMode(data.theme);
-            console.log("Backend theme:", data.theme, "-> Frontend mode:", newMode);
-            
-            // Apply immediately without checking
+            console.log(
+              "Backend theme:",
+              data.theme,
+              "-> Frontend mode:",
+              newMode,
+            );
+
             setMode(newMode);
-            
-            // Also save to localStorage
+
             if (typeof window !== "undefined") {
-              window.localStorage.setItem(THEME_STORAGE_KEY, newMode);
+              window.localStorage.setItem(
+                THEME_STORAGE_KEY,
+                newMode,
+              );
             }
           }
         }
@@ -127,9 +161,11 @@ const MainHeader: React.FC = () => {
     try {
       setLoadingNotifications(true);
       const res = await apiClient.get<PaginatedNotificationResponse>(
-        "/api/notifications/"
+        "/api/notifications/",
       );
-      const unread = (res.data.results || []).filter((n) => !n.is_read).length;
+      const unread = (res.data.results || []).filter(
+        (n) => !n.is_read,
+      ).length;
       setUnreadCount(unread);
     } catch {
       // ignore
@@ -149,30 +185,34 @@ const MainHeader: React.FC = () => {
     if (path === "/products" && location.pathname === "/products/nearby") {
       return "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
     }
-    
+
     // Check exact match first
     if (location.pathname === path) {
       return "text-orange-600 dark:text-orange-400 font-semibold";
     }
-    
+
     // For parent paths (excluding root), check if current path starts with them
     if (path !== "/" && location.pathname.startsWith(path + "/")) {
       return "text-orange-600 dark:text-orange-400 font-semibold";
     }
-    
+
     return "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
   };
 
   const displayName = useMemo(() => {
     if (!user) return "";
     if (user.first_name || user.last_name) {
-      return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+      return `${user.first_name || ""} ${
+        user.last_name || ""
+      }`.trim();
     }
     return user.username;
   }, [user]);
 
   const sellerName = sellerProfile?.business_name || "";
-  const avatarUrl: string | null = null;
+
+  // Picha halisi ya user ikitoka backend, vinginevyo initials
+  const avatarUrl: string | null = user?.avatar_url ?? null;
 
   const initials = useMemo(() => {
     const base = sellerName || displayName || "L";
@@ -181,50 +221,30 @@ const MainHeader: React.FC = () => {
 
   const isSeller = profileSettings?.is_seller ?? false;
 
-  // Function to update backend when language changes
-  const handleChangeLanguage = async (lang: "en" | "sw") => {
+  // ================= LANGUAGE / THEME SWITCHES =================
+
+  // Header language switch: haifanyi tena PATCH backend.
+  // Backend ata-update language kwenye profile page (My Profile) peke yake.
+  const handleChangeLanguage = (lang: "en" | "sw") => {
     console.log("Changing language to:", lang);
-    
-    // Update language locally immediately
+
     setLanguage(lang);
-    
-    // If user is logged in, update backend
-    if (user) {
-      try {
-        await apiClient.patch("/api/auth/settings/", {
-          preferred_language: lang,
-        });
-        console.log("Backend language updated successfully");
-      } catch (error) {
-        console.error("Failed to update language on backend:", error);
-        // Continue anyway - user can still use the language locally
-      }
+
+    // Hifadhi local preference ili hata kama user haja-login bado
+    // anaendeleza lugha aliyoichagua.
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("app_language", lang);
     }
   };
 
-  // Function to update backend when theme changes
-  const handleChangeTheme = async (newMode: ThemeMode) => {
+  // Header theme switch: haifanyi tena PATCH backend.
+  // Backend ata-update theme kwenye profile page (My Profile) peke yake.
+  const handleChangeTheme = (newMode: ThemeMode) => {
     console.log("Changing theme to:", newMode);
-    
-    // Update theme locally immediately
+
     setMode(newMode);
-    
-    // If user is logged in, update backend
-    if (user) {
-      try {
-        const backendTheme = mapThemeModeToBackend(newMode);
-        console.log("Updating backend theme to:", backendTheme);
-        
-        await apiClient.patch("/api/auth/settings/", {
-          theme: backendTheme,
-        });
-        
-        console.log("Backend theme updated successfully");
-      } catch (error) {
-        console.error("Failed to update theme on backend:", error);
-        // Continue anyway - user can still use the theme locally
-      }
-    }
+    // ThemeProvider tayari inaandika THEME_STORAGE_KEY kwenye localStorage,
+    // kwa hiyo hatuhitaji kuandika tena hapa.
   };
 
   const handleLogout = async () => {
@@ -259,7 +279,7 @@ const MainHeader: React.FC = () => {
           </Link>
         </div>
 
-        {/* CENTER: DESKTOP NAV (kuanzia karibu na logo) */}
+        {/* CENTER: DESKTOP NAV */}
         <nav className="hidden md:flex items-center gap-4 text-[11px] ml-4">
           <Link to="/products" className={isActive("/products")}>
             {language === "sw" ? "Bidhaa" : "Products"}
@@ -281,7 +301,7 @@ const MainHeader: React.FC = () => {
           </Link>
         </nav>
 
-        {/* RIGHT: ACTIONS (push kulia) */}
+        {/* RIGHT: ACTIONS */}
         <div className="flex items-center gap-2 ml-auto">
           {/* DESKTOP: LANGUAGE + THEME */}
           <div className="hidden lg:flex items-center gap-2">
@@ -402,14 +422,18 @@ const MainHeader: React.FC = () => {
                   to="/register"
                   className="px-3 py-1.5 rounded-full bg-orange-500 text-white text-[11px] font-medium hover:bg-orange-600 shadow-sm"
                 >
-                  {language === "sw" ? "Fungua akaunti" : "Create account"}
+                  {language === "sw"
+                    ? "Fungua akaunti"
+                    : "Create account"}
                 </Link>
               </div>
             ) : (
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setDesktopProfileOpen((v) => !v)}
+                  onClick={() =>
+                    setDesktopProfileOpen((v) => !v)
+                  }
                   className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-semibold overflow-hidden">
@@ -425,7 +449,9 @@ const MainHeader: React.FC = () => {
                   </div>
                   <div className="hidden sm:flex flex-col items-start leading-tight">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                      {language === "sw" ? "Umeingia kama" : "Logged in as"}
+                      {language === "sw"
+                        ? "Umeingia kama"
+                        : "Logged in as"}
                     </span>
                     <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-100 max-w-[140px] truncate">
                       {sellerName || displayName}
@@ -467,7 +493,9 @@ const MainHeader: React.FC = () => {
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                           {isSeller
                             ? sellerName ||
-                              (language === "sw" ? "Muuzaji" : "Seller")
+                              (language === "sw"
+                                ? "Muuzaji"
+                                : "Seller")
                             : language === "sw"
                             ? "Mnunuaji"
                             : "Buyer"}
@@ -623,7 +651,9 @@ const MainHeader: React.FC = () => {
                           </svg>
                         </span>
                         <span>
-                          {language === "sw" ? "Toka (Logout)" : "Logout"}
+                          {language === "sw"
+                            ? "Toka (Logout)"
+                            : "Logout"}
                         </span>
                       </button>
                     </div>
@@ -633,7 +663,7 @@ const MainHeader: React.FC = () => {
             )}
           </div>
 
-          {/* MOBILE MENU BUTTON (hamburger icon) */}
+          {/* MOBILE MENU BUTTON */}
           <button
             type="button"
             className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80"
@@ -679,7 +709,9 @@ const MainHeader: React.FC = () => {
                   <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                     {isSeller
                       ? sellerName ||
-                        (language === "sw" ? "Muuzaji" : "Seller")
+                        (language === "sw"
+                          ? "Muuzaji"
+                          : "Seller")
                       : language === "sw"
                       ? "Mnunuaji"
                       : "Buyer"}
@@ -712,7 +744,9 @@ const MainHeader: React.FC = () => {
                     }}
                     className="px-3 py-1.5 rounded-full bg-orange-500 text-white text-[11px] font-medium"
                   >
-                    {language === "sw" ? "Jisajili" : "Register"}
+                    {language === "sw"
+                      ? "Jisajili"
+                      : "Register"}
                   </button>
                 </div>
               </div>
@@ -732,7 +766,9 @@ const MainHeader: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`py-1.5 ${isActive("/products/nearby")}`}
               >
-                {language === "sw" ? "Bidhaa karibu" : "Near products"}
+                {language === "sw"
+                  ? "Bidhaa karibu"
+                  : "Near products"}
               </Link>
               <Link
                 to="/sellers"
@@ -746,7 +782,9 @@ const MainHeader: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`py-1.5 ${isActive("/seller-profile")}`}
               >
-                {language === "sw" ? "Uza kwenye LINKER" : "Sell on LINKER"}
+                {language === "sw"
+                  ? "Uza kwenye LINKER"
+                  : "Sell on LINKER"}
               </Link>
               {user && (
                 <button
@@ -758,7 +796,9 @@ const MainHeader: React.FC = () => {
                   className="flex items-center justify-between py-1.5 text-slate-600 dark:text-slate-200"
                 >
                   <span>
-                    {language === "sw" ? "Arifa" : "Notifications"}
+                    {language === "sw"
+                      ? "Arifa"
+                      : "Notifications"}
                   </span>
                   {unreadCount > 0 && (
                     <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-[10px] text-white font-semibold">
@@ -854,7 +894,9 @@ const MainHeader: React.FC = () => {
                   onClick={handleLogout}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 text-[11px] font-medium rounded-full"
                 >
-                  {language === "sw" ? "Toka (Logout)" : "Logout"}
+                  {language === "sw"
+                    ? "Toka (Logout)"
+                    : "Logout"}
                 </button>
               </div>
             )}

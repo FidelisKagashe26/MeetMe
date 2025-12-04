@@ -1,109 +1,101 @@
 // src/contexts/ThemeContext.tsx
+
 import React, {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useState,
-  useCallback,
 } from "react";
 import type { ThemeMode } from "../types/theme";
+import { THEME_STORAGE_KEY } from "../constants/theme";
 
 interface ThemeContextValue {
-  mode: ThemeMode;
-  resolvedTheme: "light" | "dark";
+  mode: ThemeMode; // "light" | "dark" | "auto"
   setMode: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-const THEME_STORAGE_KEY = "app_theme_mode";
-
-const getInitialMode = (): ThemeMode => {
-  if (typeof window === "undefined") return "auto";
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-  if (stored === "light" || stored === "dark" || stored === "auto") return stored;
-  return "auto";
-};
-
-const getSystemPreference = (): "light" | "dark" | null => {
-  if (typeof window === "undefined" || !window.matchMedia) return null;
-  try {
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-    if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-      return "light";
-    }
-  } catch {
-    // ignore
+function getInitialMode(): ThemeMode {
+  if (typeof window === "undefined") {
+    return "light";
   }
-  return null;
-};
+
+  const stored = window.localStorage.getItem(
+    THEME_STORAGE_KEY,
+  ) as ThemeMode | null;
+
+  if (stored === "light" || stored === "dark" || stored === "auto") {
+    return stored;
+  }
+
+  // default: AUTO => mchana light, usiku dark
+  return "auto";
+}
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [mode, setModeState] = useState<ThemeMode>(() => getInitialMode());
+  const [mode, setMode] = useState<ThemeMode>(() => getInitialMode());
 
-  const resolvedTheme = useMemo<"light" | "dark">(() => {
-    // kama user amechagua moja kwa moja
-    if (mode === "light" || mode === "dark") return mode;
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
 
-    // mode === "auto" => tumia system preference kama ipo
-    const sys = getSystemPreference();
-    if (sys) return sys;
+    // Hifadhi preference ya user kwenye localStorage
+    window.localStorage.setItem(THEME_STORAGE_KEY, mode);
 
-    // fallback time-of-day
-    const hour = new Date().getHours();
-    const isDayTime = hour >= 7 && hour < 19;
-    return isDayTime ? "light" : "dark";
+    let intervalId: number | undefined;
+
+    const applyTheme = () => {
+      let effective: "light" | "dark" = "light";
+
+      if (mode === "light") {
+        effective = "light";
+      } else if (mode === "dark") {
+        effective = "dark";
+      } else {
+        // AUTO: mchana 07:00–18:59 => light, usiku => dark
+        const hour = new Date().getHours();
+        effective = hour >= 7 && hour < 19 ? "light" : "dark";
+      }
+
+      if (effective === "dark") {
+        document.documentElement.classList.add("dark");
+        document.documentElement.style.colorScheme = "dark";
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.style.colorScheme = "light";
+      }
+    };
+
+    // Apply mara moja
+    applyTheme();
+
+    // Kama mode ni "auto", check tena kila dakika 5 ili kubadilika kati ya mchana/usiku
+    if (mode === "auto") {
+      intervalId = window.setInterval(applyTheme, 5 * 60 * 1000);
+    }
+
+    return () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+    };
   }, [mode]);
 
-  // Apply theme kwenye <html> + hifadhi mode kwenye localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const root = window.document.documentElement;
-
-    // Remove existing theme classes
-    root.classList.remove("light", "dark");
-    
-    // Apply the resolved theme
-    root.classList.add(resolvedTheme);
-    
-    // Set data attributes
-    root.setAttribute("data-theme-mode", mode);
-    root.setAttribute("data-theme-resolved", resolvedTheme);
-
-    // Save to localStorage
-    window.localStorage.setItem(THEME_STORAGE_KEY, mode);
-  }, [mode, resolvedTheme]);
-
-  // Main setMode function
-  const setMode = useCallback((newMode: ThemeMode) => {
-    setModeState(newMode);
-    
-    // Save to localStorage immediately
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(THEME_STORAGE_KEY, newMode);
-    }
-  }, []);
-
-  const value: ThemeContextValue = useMemo(
-    () => ({
-      mode,
-      resolvedTheme,
-      setMode,
-    }),
-    [mode, resolvedTheme, setMode]
-  );
+  const value: ThemeContextValue = {
+    mode,
+    setMode,
+  };
 
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = (): ThemeContextValue => {
   const ctx = useContext(ThemeContext);
   if (!ctx) {

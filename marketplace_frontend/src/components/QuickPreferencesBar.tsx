@@ -4,10 +4,10 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useLanguage } from "../contexts/LanguageContext";
 
 const QuickPreferencesBar: React.FC = () => {
-  const { mode, resolvedTheme, setMode } = useTheme();
+  const { mode, setMode } = useTheme();
   const { language, setLanguage } = useLanguage();
 
-  const isDark = resolvedTheme === "dark";
+  const isDark = mode === "dark";
 
   return (
     <div className="w-full flex items-center justify-end gap-2 px-3 py-1.5 text-[11px] bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200/70 dark:border-slate-800/70">

@@ -1,18 +1,24 @@
 // src/types/theme.ts
+
+// Mode inayotumiwa na frontend (ThemeContext + UI)
 export type ThemeMode = "light" | "dark" | "auto";
+
+// Mode inayotumiwa na backend (DRF /api/auth/settings/)
 export type BackendTheme = "light" | "dark" | "system";
 
-// Frontend "auto" maps to Backend "system"
-export const mapBackendThemeToMode = (value: BackendTheme | undefined | null): ThemeMode => {
-  if (!value) return "auto";
-  if (value === "light") return "light";
-  if (value === "dark") return "dark";
-  return "auto"; // "system" => "auto"
-};
+// Kutoka backend (DB) kwenda frontend
+export function mapBackendThemeToMode(
+  theme: BackendTheme | null | undefined,
+): ThemeMode {
+  if (!theme || theme === "system") {
+    // "system" tunai-mantiki kama "auto" (mchana light, usiku dark)
+    return "auto";
+  }
+  return theme;
+}
 
-// Frontend "auto" maps to Backend "system"
-export const mapThemeModeToBackend = (mode: ThemeMode): BackendTheme => {
-  if (mode === "light") return "light";
-  if (mode === "dark") return "dark";
-  return "system"; // "auto" => "system"
-};
+// Kutoka frontend mode kwenda backend (tunapost /api/auth/settings/)
+export function mapThemeModeToBackend(mode: ThemeMode): BackendTheme {
+  if (mode === "light" || mode === "dark") return mode;
+  return "system"; // "auto" -> "system"
+}

@@ -7,9 +7,12 @@ export interface User {
   first_name: string;
   last_name: string;
   date_joined: string;
+
+  // Extra fields za optional:
   is_seller?: boolean;
   preferred_language?: "en" | "sw" | null;
   theme?: "light" | "dark" | "system" | null;
+  avatar_url?: string | null; 
 }
 
 export interface AuthData {

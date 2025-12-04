@@ -27,13 +27,13 @@ const apiClient = axios.create({
 // =================== REQUEST INTERCEPTOR ===================
 apiClient.interceptors.request.use(
   (config: ExtendedAxiosRequestConfig) => {
-    // washa global loader
     startGlobalLoading();
 
     const token = getAccessToken();
     if (token) {
       config.headers = config.headers ?? {};
-      (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+      (config.headers as Record<string, string>).Authorization =
+        `Bearer ${token}`;
     }
 
     return config;
@@ -73,20 +73,31 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     stopGlobalLoading();
 
-    const originalRequest = error.config as ExtendedAxiosRequestConfig | undefined;
+    const originalRequest = error.config as
+      | ExtendedAxiosRequestConfig
+      | undefined;
+    const response = error.response;
 
-    if (!originalRequest || !error.response) {
+    if (!originalRequest || !response) {
       return Promise.reject(error);
     }
 
-    const status = error.response.status;
+    const status = response.status;
+    const isRefreshEndpoint =
+      originalRequest.url?.includes("/api/auth/jwt/refresh/") ?? false;
 
-    // sio 401, au tayari tumeshajaribu refresh, au hakuna refresh token => rudi error kama ilivyo
-    if (status !== 401 || originalRequest._retry || !getRefreshToken()) {
+    // Sio 401, au tayari tumejaribu, au hakuna refresh token,
+    // au ni request yenyewe ya /jwt/refresh/ => usijaribu tena, rudisha error tu.
+    if (
+      status !== 401 ||
+      originalRequest._retry ||
+      !getRefreshToken() ||
+      isRefreshEndpoint
+    ) {
       return Promise.reject(error);
     }
 
-    // kama kuna process ya refresh inaendelea, weka kwenye foleni
+    // Kama kuna process ya refresh inaendelea, weka request kwenye foleni
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
@@ -97,7 +108,8 @@ apiClient.interceptors.response.use(
             typeof token === "string" &&
             token.trim()
           ) {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
+            (originalRequest.headers as Record<string, string>)
+              .Authorization = `Bearer ${token}`;
           }
           return apiClient(originalRequest);
         })
@@ -110,18 +122,36 @@ apiClient.interceptors.response.use(
 
     try {
       const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        clearAuthData();
+        processQueue(null, null);
+        isRefreshing = false;
+        return Promise.reject(error);
+      }
 
-      const refreshResponse = await axios.post(
-        `${baseURL}/api/auth/jwt/refresh/`,
-        { refresh: refreshToken },
-      );
+      // Tumia axios plain ili tusipigwe tena na interceptor
+      const refreshResponse = await axios.post<{
+        access: string;
+        refresh?: string;
+      }>(`${baseURL}/api/auth/jwt/refresh/`, {
+        refresh: refreshToken,
+      });
 
-      const data = refreshResponse.data as { access: string };
-      const newAccess = data.access;
+      const { access: newAccess, refresh: maybeNewRefresh } =
+        refreshResponse.data;
+
+      if (!newAccess) {
+        clearAuthData();
+        processQueue(
+          new Error("No access token in refresh response"),
+          null,
+        );
+        isRefreshing = false;
+        return Promise.reject(error);
+      }
+
       const user = getUser();
-
       if (!user) {
-        // hatuna user kwenye storage – safisha kila kitu
         clearAuthData();
         processQueue(null, null);
         isRefreshing = false;
@@ -130,23 +160,25 @@ apiClient.interceptors.response.use(
 
       const newAuth: AuthData = {
         access: newAccess,
-        refresh: refreshToken ?? "",
+        // Kama backend anarotate refresh token, tunaiheshimu; vinginevyo tumia ya zamani
+        refresh: maybeNewRefresh ?? refreshToken,
         user,
       };
 
-      // hifadhi access mpya (na kuwajulisha listeners – AuthContext n.k.)
+      // Hifadhi access mpya (na ku-notify listeners – AuthContext n.k.)
       saveAuthData(newAuth);
 
-      // rudisha token mpya kwa zilizo-subscribe kwenye foleni
+      // Rudisha token mpya kwa waliokuwa kwenye foleni
       processQueue(null, newAccess);
       isRefreshing = false;
 
       originalRequest.headers = originalRequest.headers ?? {};
-      originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+      (originalRequest.headers as Record<string, string>).Authorization =
+        `Bearer ${newAccess}`;
 
       return apiClient(originalRequest);
     } catch (refreshError) {
-      // refresh imeshindikana: clear auth, notify, na toa error
+      // Refresh imeshindikana: safisha auth, notify na rudisha error
       clearAuthData();
       processQueue(refreshError, null);
       isRefreshing = false;
