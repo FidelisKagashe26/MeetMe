@@ -5,13 +5,13 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useCallback,
 } from "react";
-
-export type ThemeMode = "light" | "dark" | "auto";
+import type { ThemeMode } from "../types/theme";
 
 interface ThemeContextValue {
-  mode: ThemeMode; // chaguo la user (light | dark | auto)
-  resolvedTheme: "light" | "dark"; // theme halisi inayotumika sasa
+  mode: ThemeMode;
+  resolvedTheme: "light" | "dark";
   setMode: (mode: ThemeMode) => void;
 }
 
@@ -26,7 +26,6 @@ const getInitialMode = (): ThemeMode => {
   return "auto";
 };
 
-// Jaribu kusoma system preference (OS) mara moja
 const getSystemPreference = (): "light" | "dark" | null => {
   if (typeof window === "undefined" || !window.matchMedia) return null;
   try {
@@ -45,8 +44,7 @@ const getSystemPreference = (): "light" | "dark" | null => {
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  // IMPORTANT: tumia callback hapa ili getInitialMode iitwe mara moja tu
-  const [mode, setMode] = useState<ThemeMode>(() => getInitialMode());
+  const [mode, setModeState] = useState<ThemeMode>(() => getInitialMode());
 
   const resolvedTheme = useMemo<"light" | "dark">(() => {
     // kama user amechagua moja kwa moja
@@ -68,17 +66,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const root = window.document.documentElement;
 
-    if (resolvedTheme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-
+    // Remove existing theme classes
+    root.classList.remove("light", "dark");
+    
+    // Apply the resolved theme
+    root.classList.add(resolvedTheme);
+    
+    // Set data attributes
     root.setAttribute("data-theme-mode", mode);
     root.setAttribute("data-theme-resolved", resolvedTheme);
 
+    // Save to localStorage
     window.localStorage.setItem(THEME_STORAGE_KEY, mode);
   }, [mode, resolvedTheme]);
+
+  // Main setMode function
+  const setMode = useCallback((newMode: ThemeMode) => {
+    setModeState(newMode);
+    
+    // Save to localStorage immediately
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(THEME_STORAGE_KEY, newMode);
+    }
+  }, []);
 
   const value: ThemeContextValue = useMemo(
     () => ({
@@ -86,7 +96,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       resolvedTheme,
       setMode,
     }),
-    [mode, resolvedTheme]
+    [mode, resolvedTheme, setMode]
   );
 
   return (
@@ -94,7 +104,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = (): ThemeContextValue => {
   const ctx = useContext(ThemeContext);
   if (!ctx) {

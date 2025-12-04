@@ -18,7 +18,7 @@ interface PaginatedCategoryList {
 }
 
 interface ProductCreateForm {
-  category_id: string; // tunahifadhi kama string kwenye form, tutaconvert wakati wa submit
+  category_id: string; // tunahifadhi kama string, tutaconvert wakati wa submit
   name: string;
   description: string;
   price: string;
@@ -73,7 +73,7 @@ const ProductCreatePage: React.FC = () => {
         );
         setCategories(res.data.results || []);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to load categories", err);
       } finally {
         setLoadingCategories(false);
       }
@@ -84,10 +84,10 @@ const ProductCreatePage: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50">
+      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
         <MainHeader />
         <main className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 text-sm text-slate-900 dark:text-slate-100">
             You must be logged in to add a product.
           </div>
         </main>
@@ -155,6 +155,10 @@ const ProductCreatePage: React.FC = () => {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  /**
+   * Upload product image kupitia /api/product-images/
+   * NOTE: hatuweki manually "Content-Type" ili browser / axios aweke boundary sahihi.
+   */
   const uploadProductImage = async (
     productId: number,
     file: File
@@ -162,18 +166,12 @@ const ProductCreatePage: React.FC = () => {
     setUploadingImage(true);
     try {
       const formData = new FormData();
-      // kulingana na ProductImageRequest: product + image (file)
       formData.append("product", String(productId));
       formData.append("image", file);
 
       const res = await apiClient.post<ProductImageResponse>(
         "/api/product-images/",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        formData
       );
 
       const imageUrl = res.data.image_url ?? res.data.image;
@@ -181,12 +179,19 @@ const ProductCreatePage: React.FC = () => {
         return null;
       }
 
-      // patch product ili image_url ya product iwe sawa na gallery
-      await apiClient.patch(`/api/products/${productId}/`, {
-        image_url: imageUrl,
-      });
+      // tusasisha product ili image_url ya product iwe sawa na gallery
+      try {
+        await apiClient.patch(`/api/products/${productId}/`, {
+          image_url: imageUrl,
+        });
+      } catch (patchErr) {
+        console.warn("Image uploaded but failed to patch image_url", patchErr);
+      }
 
       return imageUrl;
+    } catch (err) {
+      console.error("Failed to upload product image", err);
+      throw err;
     } finally {
       setUploadingImage(false);
     }
@@ -199,18 +204,17 @@ const ProductCreatePage: React.FC = () => {
     setSuccess(null);
 
     try {
-      const payload: any = {
+      const payload = {
         name: form.name,
         description: form.description,
         price: form.price,
         currency: form.currency,
         stock_quantity: form.stock_quantity,
         is_active: form.is_active,
+        ...(form.category_id
+          ? { category_id: parseInt(form.category_id, 10) }
+          : {}),
       };
-
-      if (form.category_id) {
-        payload.category_id = parseInt(form.category_id, 10);
-      }
 
       // 1) Create product
       const productRes = await apiClient.post<ProductCreateResponse>(
@@ -251,49 +255,52 @@ const ProductCreatePage: React.FC = () => {
     }
   };
 
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors">
       <MainHeader />
 
       <main className="flex-1 max-w-3xl mx-auto py-8 px-4">
         <div className="mb-4 flex items-center justify-between gap-2">
-          <h2 className="text-xl font-semibold text-slate-900">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Add new product
           </h2>
           <Link
             to="/seller-profile"
-            className="text-[11px] text-orange-600 hover:underline"
+            className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline"
           >
             ← Back to seller area
           </Link>
         </div>
 
         {error && (
-          <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-100 p-2 rounded-lg">
+          <div className="mb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/40 p-2 rounded-lg">
             {error}
           </div>
         )}
         {success && (
-          <div className="mb-3 text-xs text-green-700 bg-green-50 border border-green-100 p-2 rounded-lg">
+          <div className="mb-3 text-xs text-green-700 dark:text-emerald-300 bg-green-50 dark:bg-emerald-500/10 border border-green-100 dark:border-emerald-500/40 p-2 rounded-lg">
             {success}
           </div>
         )}
 
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 md:p-6 space-y-4"
+          className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 space-y-4"
         >
           {/* Category */}
           <div className="space-y-1">
-            <label className="block text-xs text-slate-700">
+            <label className="block text-xs text-slate-700 dark:text-slate-200">
               Category{" "}
-              <span className="text-slate-400 text-[10px]">(optional)</span>
+              <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+                (optional)
+              </span>
             </label>
             <select
               name="category_id"
               value={form.category_id}
               onChange={handleChange}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               disabled={loadingCategories}
             >
               <option value="">-- Select category --</option>
@@ -307,12 +314,14 @@ const ProductCreatePage: React.FC = () => {
 
           {/* Name */}
           <div className="space-y-1">
-            <label className="block text-xs text-slate-700">Name</label>
+            <label className="block text-xs text-slate-700 dark:text-slate-200">
+              Name
+            </label>
             <input
               name="name"
               value={form.name}
               onChange={handleChange}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               placeholder="HP EliteBook 840 G5"
               required
             />
@@ -320,12 +329,14 @@ const ProductCreatePage: React.FC = () => {
 
           {/* Description */}
           <div className="space-y-1">
-            <label className="block text-xs text-slate-700">Description</label>
+            <label className="block text-xs text-slate-700 dark:text-slate-200">
+              Description
+            </label>
             <textarea
               name="description"
               value={form.description}
               onChange={handleChange}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               rows={3}
               required
             />
@@ -334,23 +345,27 @@ const ProductCreatePage: React.FC = () => {
           {/* Price & Currency */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-xs text-slate-700">Price</label>
+              <label className="block text-xs text-slate-700 dark:text-slate-200">
+                Price
+              </label>
               <input
                 name="price"
                 value={form.price}
                 onChange={handleChange}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="800000"
                 required
               />
             </div>
             <div className="space-y-1">
-              <label className="block text-xs text-slate-700">Currency</label>
+              <label className="block text-xs text-slate-700 dark:text-slate-200">
+                Currency
+              </label>
               <input
                 name="currency"
                 value={form.currency}
                 onChange={handleChange}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="TZS"
                 required
               />
@@ -360,7 +375,7 @@ const ProductCreatePage: React.FC = () => {
           {/* Stock & Active */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-xs text-slate-700">
+              <label className="block text-xs text-slate-700 dark:text-slate-200">
                 Stock quantity
               </label>
               <input
@@ -369,7 +384,7 @@ const ProductCreatePage: React.FC = () => {
                 min={0}
                 value={form.stock_quantity}
                 onChange={handleChange}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
             <div className="flex items-center gap-2 mt-5 md:mt-7">
@@ -378,9 +393,9 @@ const ProductCreatePage: React.FC = () => {
                 name="is_active"
                 checked={form.is_active}
                 onChange={handleChange}
-                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-orange-500"
+                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-slate-900 focus:ring-orange-500"
               />
-              <span className="text-xs text-slate-700">
+              <span className="text-xs text-slate-700 dark:text-slate-200">
                 Active (visible to customers)
               </span>
             </div>
@@ -388,9 +403,12 @@ const ProductCreatePage: React.FC = () => {
 
           {/* Image upload */}
           <div className="space-y-2">
-            <label className="block text-xs text-slate-700">
+            <label className="block text-xs text-slate-700 dark:text-slate-200">
               Product image
-              <span className="text-slate-400 text-[10px]"> (optional)</span>
+              <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+                {" "}
+                (optional)
+              </span>
             </label>
 
             <div className="flex items-center gap-3 flex-wrap">
@@ -403,27 +421,31 @@ const ProductCreatePage: React.FC = () => {
               />
               <label
                 htmlFor="product-image"
-                className="inline-flex items-center justify-center px-3 py-1.5 rounded-full border border-slate-300 text-[11px] font-medium text-slate-700 cursor-pointer hover:border-orange-500 hover:text-orange-600"
+                className="inline-flex items-center justify-center px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-[11px] font-medium text-slate-700 dark:text-slate-100 cursor-pointer hover:border-orange-500 hover:text-orange-600 dark:hover:border-orange-400"
               >
                 Choose image
               </label>
               {imageFile && (
-                <span className="text-[11px] text-slate-500 truncate max-w-[220px]">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
                   {imageFile.name}
                 </span>
               )}
               {uploadingImage && (
-                <span className="text-[11px] text-slate-500">Uploading...</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Uploading...
+                </span>
               )}
             </div>
 
             {imagePreview && (
               <div className="mt-1">
-                <div className="text-[11px] text-slate-500 mb-1">Preview</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                  Preview
+                </div>
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  className="w-full max-h-60 object-cover rounded-xl border border-slate-200"
+                  className="w-full max-h-60 object-cover rounded-xl border border-slate-200 dark:border-slate-700"
                 />
               </div>
             )}

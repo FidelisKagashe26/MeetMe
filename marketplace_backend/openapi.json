@@ -3228,7 +3228,7 @@
         "/api/products/": {
             "get": {
                 "operationId": "products_list",
-                "description": "ViewSet for products with location-based filtering",
+                "description": "/api/products/\n\n- Inatumia filters za kawaida (search, category, price, location ya mji).\n- Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,\n  inapanga kwa distance ASC bila ku-cut off kwa radius.\n- Inarudisha ARRAY tu, hakuna pagination ya backend.",
                 "parameters": [
                     {
                         "name": "ordering",
@@ -3285,7 +3285,7 @@
             },
             "post": {
                 "operationId": "products_create",
-                "description": "ViewSet for products with location-based filtering",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "tags": [
                     "products"
                 ],
@@ -3334,7 +3334,7 @@
         "/api/products/{id}/": {
             "get": {
                 "operationId": "products_retrieve",
-                "description": "ViewSet for products with location-based filtering",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3373,7 +3373,7 @@
             },
             "put": {
                 "operationId": "products_update",
-                "description": "ViewSet for products with location-based filtering",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3431,7 +3431,7 @@
             },
             "patch": {
                 "operationId": "products_partial_update",
-                "description": "ViewSet for products with location-based filtering",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3488,7 +3488,7 @@
             },
             "delete": {
                 "operationId": "products_destroy",
-                "description": "ViewSet for products with location-based filtering",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3521,7 +3521,7 @@
         "/api/products/mine/": {
             "get": {
                 "operationId": "products_mine_retrieve",
-                "description": "Products za muuzaji aliye login (seller dashboard)",
+                "description": "Products za muuzaji aliye login (seller dashboard)\n(Hapa nimeacha pagination kama ilivyokuwa ili dashboard isipate list\nkubwa sana kwa mara moja – ukitaka na hapa tuondoe pagination tunaweza\nkubadilisha baadaye.)",
                 "tags": [
                     "products"
                 ],
@@ -3550,7 +3550,7 @@
         "/api/products/nearby/": {
             "get": {
                 "operationId": "products_nearby_retrieve",
-                "description": "GET /api/products/nearby/?lat=...&lng=...&radius=10&location=...&limit=10",
+                "description": "GET /api/products/nearby/?lat=...&lng=...\n\n- User yeyote (guest au logged-in) anaweza kutumia.\n- LENGO: kupanga bidhaa zote kwa ukaribu na location ya user,\n  bila kuweka radius limit wala limit ya idadi ya products.\n- Radius & limit tukizipokea tunaziacha tu (for future), lakini\n  hatuzitumii kufilter – frontend ina-deal na pagination.",
                 "tags": [
                     "products"
                 ],
@@ -3580,7 +3580,7 @@
         "/api/products/search_nearby/": {
             "post": {
                 "operationId": "products_search_nearby_create",
-                "description": "Advanced nearby search via POST body",
+                "description": "Advanced nearby search via POST body (still guest-friendly)\n\nBody (NearbySearchSerializer):\n{\n    \"latitude\": ...,\n    \"longitude\": ...,\n    \"radius\": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu\n    \"category\": \"...\",\n    \"min_price\": ...,\n    \"max_price\": ...,\n    \"sort_by\": \"distance\" | \"price\" | \"rating\"\n}",
                 "tags": [
                     "products"
                 ],
@@ -4318,7 +4318,7 @@
         "/api/sellers/nearby/": {
             "get": {
                 "operationId": "sellers_nearby_retrieve",
-                "description": "Get nearby sellers based on user's location (Haversine)",
+                "description": "Get nearby sellers based on user's location (Haversine)\n\n- Hakuna tena LIMIT ya idadi ya maduka.\n- Kama `radius` imepelekwa → tunatumia filter_by_radius (km).\n- Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.\n- Pagination hatutumii hapa, tunarudisha list yote kwa frontend.",
                 "tags": [
                     "sellers"
                 ],
@@ -5864,6 +5864,11 @@
                         "type": "string",
                         "format": "binary",
                         "nullable": true
+                    },
+                    "shop_image": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
                     }
                 }
             },
@@ -6554,6 +6559,16 @@
                         "nullable": true,
                         "readOnly": true
                     },
+                    "shop_image": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "shop_image_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
                     "location": {
                         "allOf": [
                             {
@@ -6589,6 +6604,7 @@
                     "logo_url",
                     "rating",
                     "rating_count",
+                    "shop_image_url",
                     "total_sales",
                     "updated_at",
                     "user"
@@ -6673,6 +6689,11 @@
                         "type": "boolean"
                     },
                     "logo": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
+                    },
+                    "shop_image": {
                         "type": "string",
                         "format": "binary",
                         "nullable": true
@@ -7081,4 +7102,3 @@
         }
     }
 }
- 

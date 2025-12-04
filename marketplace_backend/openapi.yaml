@@ -1948,7 +1948,13 @@ paths:
   /api/products/:
     get:
       operationId: products_list
-      description: ViewSet for products with location-based filtering
+      description: |-
+        /api/products/
+
+        - Inatumia filters za kawaida (search, category, price, location ya mji).
+        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,
+          inapanga kwa distance ASC bila ku-cut off kwa radius.
+        - Inarudisha ARRAY tu, hakuna pagination ya backend.
       parameters:
       - name: ordering
         required: false
@@ -1983,7 +1989,16 @@ paths:
           description: ''
     post:
       operationId: products_create
-      description: ViewSet for products with location-based filtering
+      description: |-
+        ViewSet for products with location-based SORTING ONLY.
+
+        MUHIMU:
+        - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
+          imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
+          kama filter ili isilete EMPTY results.
       tags:
       - products
       requestBody:
@@ -2011,7 +2026,16 @@ paths:
   /api/products/{id}/:
     get:
       operationId: products_retrieve
-      description: ViewSet for products with location-based filtering
+      description: |-
+        ViewSet for products with location-based SORTING ONLY.
+
+        MUHIMU:
+        - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
+          imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
+          kama filter ili isilete EMPTY results.
       parameters:
       - in: path
         name: id
@@ -2034,7 +2058,16 @@ paths:
           description: ''
     put:
       operationId: products_update
-      description: ViewSet for products with location-based filtering
+      description: |-
+        ViewSet for products with location-based SORTING ONLY.
+
+        MUHIMU:
+        - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
+          imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
+          kama filter ili isilete EMPTY results.
       parameters:
       - in: path
         name: id
@@ -2068,7 +2101,16 @@ paths:
           description: ''
     patch:
       operationId: products_partial_update
-      description: ViewSet for products with location-based filtering
+      description: |-
+        ViewSet for products with location-based SORTING ONLY.
+
+        MUHIMU:
+        - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
+          imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
+          kama filter ili isilete EMPTY results.
       parameters:
       - in: path
         name: id
@@ -2101,7 +2143,16 @@ paths:
           description: ''
     delete:
       operationId: products_destroy
-      description: ViewSet for products with location-based filtering
+      description: |-
+        ViewSet for products with location-based SORTING ONLY.
+
+        MUHIMU:
+        - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
+          imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
+          kama filter ili isilete EMPTY results.
       parameters:
       - in: path
         name: id
@@ -2120,7 +2171,11 @@ paths:
   /api/products/mine/:
     get:
       operationId: products_mine_retrieve
-      description: Products za muuzaji aliye login (seller dashboard)
+      description: |-
+        Products za muuzaji aliye login (seller dashboard)
+        (Hapa nimeacha pagination kama ilivyokuwa ili dashboard isipate list
+        kubwa sana kwa mara moja – ukitaka na hapa tuondoe pagination tunaweza
+        kubadilisha baadaye.)
       tags:
       - products
       security:
@@ -2136,7 +2191,14 @@ paths:
   /api/products/nearby/:
     get:
       operationId: products_nearby_retrieve
-      description: GET /api/products/nearby/?lat=...&lng=...&radius=10&location=...&limit=10
+      description: |-
+        GET /api/products/nearby/?lat=...&lng=...
+
+        - User yeyote (guest au logged-in) anaweza kutumia.
+        - LENGO: kupanga bidhaa zote kwa ukaribu na location ya user,
+          bila kuweka radius limit wala limit ya idadi ya products.
+        - Radius & limit tukizipokea tunaziacha tu (for future), lakini
+          hatuzitumii kufilter – frontend ina-deal na pagination.
       tags:
       - products
       security:
@@ -2153,7 +2215,19 @@ paths:
   /api/products/search_nearby/:
     post:
       operationId: products_search_nearby_create
-      description: Advanced nearby search via POST body
+      description: |-
+        Advanced nearby search via POST body (still guest-friendly)
+
+        Body (NearbySearchSerializer):
+        {
+            "latitude": ...,
+            "longitude": ...,
+            "radius": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu
+            "category": "...",
+            "min_price": ...,
+            "max_price": ...,
+            "sort_by": "distance" | "price" | "rating"
+        }
       tags:
       - products
       requestBody:
@@ -2584,7 +2658,13 @@ paths:
   /api/sellers/nearby/:
     get:
       operationId: sellers_nearby_retrieve
-      description: Get nearby sellers based on user's location (Haversine)
+      description: |-
+        Get nearby sellers based on user's location (Haversine)
+
+        - Hakuna tena LIMIT ya idadi ya maduka.
+        - Kama `radius` imepelekwa → tunatumia filter_by_radius (km).
+        - Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.
+        - Pagination hatutumii hapa, tunarudisha list yote kwa frontend.
       tags:
       - sellers
       security:
@@ -3795,6 +3875,10 @@ components:
           type: string
           format: binary
           nullable: true
+        shop_image:
+          type: string
+          format: binary
+          nullable: true
     PatchedUserSettingsUpdateRequest:
       type: object
       description: Update basic user info + preferences (profile page)
@@ -4347,6 +4431,14 @@ components:
           type: string
           nullable: true
           readOnly: true
+        shop_image:
+          type: string
+          format: uri
+          nullable: true
+        shop_image_url:
+          type: string
+          nullable: true
+          readOnly: true
         location:
           allOf:
           - $ref: '#/components/schemas/Location'
@@ -4374,6 +4466,7 @@ components:
       - logo_url
       - rating
       - rating_count
+      - shop_image_url
       - total_sales
       - updated_at
       - user
@@ -4444,6 +4537,10 @@ components:
         is_verified:
           type: boolean
         logo:
+          type: string
+          format: binary
+          nullable: true
+        shop_image:
           type: string
           format: binary
           nullable: true

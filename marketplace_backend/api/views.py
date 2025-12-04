@@ -71,6 +71,7 @@ from .utils import (
     calculate_distance_km,
     filter_by_radius,
     sort_by_distance,
+    add_distance_to_queryset,
 )
 
 
@@ -376,38 +377,64 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
     def nearby(self, request):
         """
         Get nearby sellers based on user's location (Haversine)
+
+        - Hakuna tena LIMIT ya idadi ya maduka.
+        - Kama `radius` imepelekwa → tunatumia filter_by_radius (km).
+        - Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.
+        - Pagination hatutumii hapa, tunarudisha list yote kwa frontend.
         """
-        lat = request.query_params.get("latitude")
-        lon = request.query_params.get("longitude")
-        radius = request.query_params.get("radius", 10)
-        limit_param = request.query_params.get("limit")
+        lat = request.query_params.get("latitude") or request.query_params.get("lat")
+        lon = request.query_params.get("longitude") or request.query_params.get("lng")
+        radius_param = request.query_params.get("radius")
 
         if not lat or not lon:
             return Response(
-                {"error": "latitude and longitude are required"},
+                {"error": "latitude/lat and longitude/lng are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             lat = float(lat)
             lon = float(lon)
-            radius = float(radius)
-            limit = int(limit_param) if limit_param is not None else 10
         except ValueError:
             return Response(
-                {"error": "Invalid numeric values"},
+                {"error": "Invalid coordinate values"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if limit > 15:
-            limit = 15
+        # sellers wenye location tu
+        sellers_qs = self.filter_queryset(
+            self.queryset.filter(location__isnull=False)
+        )
 
-        sellers = self.filter_queryset(self.queryset.filter(location__isnull=False))
-        nearby_sellers = filter_by_radius(sellers, lat, lon, radius)
-        nearby_sellers = sort_by_distance(nearby_sellers)[:limit]
+        # Kama radius ipo → tutumie radius
+        if radius_param is not None:
+            try:
+                radius = float(radius_param)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid radius value"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        serializer = self.get_serializer(nearby_sellers, many=True)
+            if radius <= 0:
+                radius = 10.0
+
+            sellers = filter_by_radius(sellers_qs, lat, lon, radius)
+        else:
+            # Hakuna radius → pangilia wote kwa distance tu
+            sellers = add_distance_to_queryset(sellers_qs, lat, lon)
+
+        # panga karibu → mbali
+        sellers = sort_by_distance(sellers)
+
+        serializer = self.get_serializer(
+            sellers,
+            many=True,
+            context={"request": request},
+        )
         return Response(serializer.data)
+
 
     @action(detail=True, methods=["get"])
     def products(self, request, pk=None):
@@ -463,8 +490,17 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 class ProductViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for products with location-based filtering
+    ViewSet for products with location-based SORTING ONLY.
+
+    MUHIMU:
+    - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
+    - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+      kwa ukaribu (distance asc) bila kuweka limit ya radius.
+    - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
+      imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
+      kama filter ili isilete EMPTY results.
     """
+
     queryset = (
         Product.objects.select_related("seller", "seller__location", "category")
         .prefetch_related("images", "likes")
@@ -480,6 +516,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductSerializer
 
     def get_permissions(self):
+        # Ku-create/kubadilisha bidhaa ni lazima uwe logged in,
+        # lakini ku-list, ku-view detail, na nearby viko wazi kwa wote.
         if self.action in ["create", "update", "partial_update", "destroy", "mine"]:
             return [IsAuthenticated()]
         return [AllowAny()]
@@ -492,11 +530,20 @@ class ProductViewSet(viewsets.ModelViewSet):
         serializer.save(seller=seller_profile)
 
     def get_queryset(self):
+        """
+        Filters za msingi (category, price, location ya mji).
+
+        KUMBUKA:
+        - SearchFilter bado inafanya kazi kupitia ?search=...
+        - Hapa hatugusi lat/lng; hizo zinashughulikiwa kwenye list() na nearby().
+        """
         queryset = super().get_queryset()
-        category = self.request.query_params.get("category")
-        min_price = self.request.query_params.get("min_price")
-        max_price = self.request.query_params.get("max_price")
-        location_text = self.request.query_params.get("location")
+        request = self.request
+
+        category = request.query_params.get("category")
+        min_price = request.query_params.get("min_price")
+        max_price = request.query_params.get("max_price")
+        location_text = request.query_params.get("location")
 
         if category:
             queryset = queryset.filter(category__name__icontains=category)
@@ -504,20 +551,77 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(price__gte=min_price)
         if max_price:
             queryset = queryset.filter(price__lte=max_price)
+
+        # Location ya mji (mf. "Dodoma", "Mwanza")
+        # Lakini tukiona "Current location", "My location" n.k. hatuiweke kama filter
         if location_text:
-            queryset = queryset.filter(seller__location__city__icontains=location_text)
+            normalized = location_text.strip().lower()
+            if normalized not in (
+                "current location",
+                "my location",
+                "current_location",
+                "my_location",
+            ):
+                queryset = queryset.filter(
+                    seller__location__city__icontains=location_text
+                )
 
         return queryset
 
-    @action(detail=False, methods=["get"])
+    def list(self, request, *args, **kwargs):
+        """
+        /api/products/
+
+        - Inatumia filters za kawaida (search, category, price, location ya mji).
+        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,
+          inapanga kwa distance ASC bila ku-cut off kwa radius.
+        - Inarudisha ARRAY tu, hakuna pagination ya backend.
+        """
+        # apply SearchFilter, OrderingFilter, na get_queryset filters
+        base_qs = self.filter_queryset(self.get_queryset())
+
+        lat = request.query_params.get("lat") or request.query_params.get("latitude")
+        lon = request.query_params.get("lng") or request.query_params.get("longitude")
+
+        items = list(base_qs)
+
+        if lat and lon:
+            try:
+                lat_f = float(lat)
+                lon_f = float(lon)
+            except ValueError:
+                lat_f = None
+                lon_f = None
+
+            if lat_f is not None and lon_f is not None:
+                # ongeza distance kwa kila product na upange kwa ukaribu
+                items = add_distance_to_queryset(items, lat_f, lon_f)
+                items = sort_by_distance(items)
+
+        serializer = self.get_serializer(
+            items,
+            many=True,
+            context={"request": request},
+        )
+        return Response(serializer.data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[AllowAny],
+    )
     def nearby(self, request):
         """
-        GET /api/products/nearby/?lat=...&lng=...&radius=10&location=...&limit=10
+        GET /api/products/nearby/?lat=...&lng=...
+
+        - User yeyote (guest au logged-in) anaweza kutumia.
+        - LENGO: kupanga bidhaa zote kwa ukaribu na location ya user,
+          bila kuweka radius limit wala limit ya idadi ya products.
+        - Radius & limit tukizipokea tunaziacha tu (for future), lakini
+          hatuzitumii kufilter – frontend ina-deal na pagination.
         """
         lat = request.query_params.get("lat") or request.query_params.get("latitude")
         lon = request.query_params.get("lng") or request.query_params.get("longitude")
-        radius = request.query_params.get("radius", 10)
-        limit_param = request.query_params.get("limit")
 
         if not lat or not lon:
             return Response(
@@ -526,35 +630,48 @@ class ProductViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            lat = float(lat)
-            lon = float(lon)
-            radius = float(radius)
-            limit = int(limit_param) if limit_param is not None else 10
+            lat_f = float(lat)
+            lon_f = float(lon)
         except ValueError:
             return Response(
-                {"error": "Invalid numeric values"},
+                {"error": "Invalid coordinate values"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if limit > 15:
-            limit = 15
-
+        # tumia filters za kawaida (search, category, price, n.k.)
         base_qs = self.filter_queryset(self.get_queryset())
-        products = filter_by_radius(base_qs, lat, lon, radius)
-        products = sort_by_distance(products)[:limit]
 
-        page = self.paginate_queryset(products)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True, context={"request": request})
-            return self.get_paginated_response(serializer.data)
+        # ongeza distance kwa kila product, panga kwa ukaribu
+        products = add_distance_to_queryset(base_qs, lat_f, lon_f)
+        products = sort_by_distance(products)
 
-        serializer = self.get_serializer(products, many=True, context={"request": request})
+        # HATUFANYI pagination hapa – tunarudisha array yote
+        serializer = self.get_serializer(
+            products,
+            many=True,
+            context={"request": request},
+        )
         return Response(serializer.data)
 
-    @action(detail=False, methods=["post"])
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[AllowAny],
+    )
     def search_nearby(self, request):
         """
-        Advanced nearby search via POST body
+        Advanced nearby search via POST body (still guest-friendly)
+
+        Body (NearbySearchSerializer):
+        {
+            "latitude": ...,
+            "longitude": ...,
+            "radius": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu
+            "category": "...",
+            "min_price": ...,
+            "max_price": ...,
+            "sort_by": "distance" | "price" | "rating"
+        }
         """
         serializer = NearbySearchSerializer(data=request.data)
         if not serializer.is_valid():
@@ -563,11 +680,10 @@ class ProductViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
         lat = float(data["latitude"])
         lon = float(data["longitude"])
-        radius = data.get("radius", 10)
         category = data.get("category")
         min_price = data.get("min_price")
         max_price = data.get("max_price")
-        sort_by = data.get("sort_by", "distance")
+        sort_by_field = data.get("sort_by", "distance")
 
         queryset = self.filter_queryset(self.get_queryset())
 
@@ -578,27 +694,35 @@ class ProductViewSet(viewsets.ModelViewSet):
         if max_price:
             queryset = queryset.filter(price__lte=max_price)
 
-        products = filter_by_radius(queryset, lat, lon, radius)
+        # HATUTUMII filter_by_radius tena – tuna-add distance na kupanga tu
+        products = add_distance_to_queryset(queryset, lat, lon)
 
-        if sort_by == "distance":
+        if sort_by_field == "distance":
             products = sort_by_distance(products)
-        elif sort_by == "price":
+        elif sort_by_field == "price":
             products = sorted(products, key=lambda x: x.price)
-        elif sort_by == "rating":
-            products = sorted(products, key=lambda x: x.seller.rating, reverse=True)
+        elif sort_by_field == "rating":
+            products = sorted(
+                products,
+                key=lambda x: getattr(x.seller, "rating", 0),
+                reverse=True,
+            )
 
-        page = self.paginate_queryset(products)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True, context={"request": request})
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(products, many=True, context={"request": request})
-        return Response(serializer.data)
+        # hakuna limit – frontend itapanga pagination 10/20 nk.
+        out = self.get_serializer(
+            products,
+            many=True,
+            context={"request": request},
+        )
+        return Response(out.data)
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def mine(self, request):
         """
         Products za muuzaji aliye login (seller dashboard)
+        (Hapa nimeacha pagination kama ilivyokuwa ili dashboard isipate list
+        kubwa sana kwa mara moja – ukitaka na hapa tuondoe pagination tunaweza
+        kubadilisha baadaye.)
         """
         try:
             seller_profile = request.user.seller_profile
@@ -608,10 +732,18 @@ class ProductViewSet(viewsets.ModelViewSet):
         qs = self.get_queryset().filter(seller=seller_profile)
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={"request": request})
+            serializer = self.get_serializer(
+                page,
+                many=True,
+                context={"request": request},
+            )
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(qs, many=True, context={"request": request})
+        serializer = self.get_serializer(
+            qs,
+            many=True,
+            context={"request": request},
+        )
         return Response(serializer.data)
 
 

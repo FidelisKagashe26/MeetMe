@@ -104,6 +104,12 @@ class SellerProfile(models.Model):
         null=True,
     )
 
+    shop_image = models.ImageField(
+        upload_to="shops/images/",
+        blank=True,
+        null=True,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -191,7 +197,6 @@ class Location(models.Model):
     postal_code = models.CharField(max_length=20, blank=True)
     latitude = models.DecimalField(max_digits=10, decimal_places=8)
     longitude = models.DecimalField(max_digits=11, decimal_places=8)
-    # still kept for compatibility if ever needed, but you can drop later
     mapbox_place_id = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -329,6 +329,8 @@ class SellerProfileSerializer(serializers.ModelSerializer):
 
     logo_url = serializers.SerializerMethodField()
 
+    shop_image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = SellerProfile
         fields = [
@@ -344,6 +346,8 @@ class SellerProfileSerializer(serializers.ModelSerializer):
             "items_sold",
             "logo",
             "logo_url",
+            "shop_image",
+            "shop_image_url",
             "location",
             "distance",
             "created_at",
@@ -365,6 +369,11 @@ class SellerProfileSerializer(serializers.ModelSerializer):
     def get_logo_url(self, obj):
         request = self.context.get("request")
         return _build_absolute_uri(request, obj.logo)
+    
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_shop_image_url(self, obj):
+        request = self.context.get("request")
+        return _build_absolute_uri(request, obj.shop_image)
 
 
 class SellerMiniSerializer(serializers.ModelSerializer):

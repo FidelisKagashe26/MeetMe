@@ -1,15 +1,14 @@
 // src/components/MainHeader.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../lib/apiClient";
 import { useTheme } from "../contexts/ThemeContext";
-import type { ThemeMode } from "../contexts/ThemeContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { FiSun, FiMoon } from "react-icons/fi";
 import { LuMonitor } from "react-icons/lu";
-
-type BackendTheme = "light" | "dark" | "system" | "auto";
+import { mapBackendThemeToMode, mapThemeModeToBackend } from "../types/theme";
+import type { ThemeMode, BackendTheme, } from "../types/theme";
 
 interface ProfileSettings {
   is_seller: boolean;
@@ -45,13 +44,6 @@ interface PaginatedNotificationResponse {
   results: Notification[];
 }
 
-const mapBackendThemeToMode = (value: BackendTheme | undefined): ThemeMode => {
-  if (!value) return "auto";
-  if (value === "light" || value === "dark") return value;
-  // system/auto => auto
-  return "auto";
-};
-
 const MainHeader: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -66,18 +58,20 @@ const MainHeader: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
-  const [profileSettings, setProfileSettings] =
-    useState<ProfileSettings | null>(null);
-  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(
-    null
-  );
+  const [profileSettings, setProfileSettings] = useState<ProfileSettings | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
 
-  // ================= LOAD PROFILE SETTINGS & SELLER PROFILE =================
   useEffect(() => {
     if (!user) {
       setProfileSettings(null);
       setSellerProfile(null);
       setUnreadCount(0);
+      
+      // For non-logged in users, use localStorage
+      const storedTheme = localStorage.getItem("app_theme_mode") as ThemeMode | null;
+      if (storedTheme && storedTheme !== mode) {
+        setMode(storedTheme);
+      }
       return;
     }
 
@@ -92,19 +86,22 @@ const MainHeader: React.FC = () => {
           const data = settingsRes.value.data;
           setProfileSettings(data);
 
-          // sync language kutoka backend kama ipo
-          if (
-            data.preferred_language &&
-            data.preferred_language !== language
-          ) {
+          // Sync language
+          if (data.preferred_language && data.preferred_language !== language) {
             setLanguage(data.preferred_language);
           }
 
-          // sync theme kutoka backend kama default wakati anaingia
+          // Sync theme - CRITICAL: Apply backend theme IMMEDIATELY
           if (data.theme) {
             const newMode = mapBackendThemeToMode(data.theme);
-            if (newMode !== mode) {
-              setMode(newMode);
+            console.log("Backend theme:", data.theme, "-> Frontend mode:", newMode);
+            
+            // Apply immediately without checking
+            setMode(newMode);
+            
+            // Also save to localStorage
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem(THEME_STORAGE_KEY, newMode);
             }
           }
         }
@@ -112,14 +109,13 @@ const MainHeader: React.FC = () => {
         if (sellerRes.status === "fulfilled") {
           setSellerProfile(sellerRes.value.data);
         }
-      } catch {
-        // silent
+      } catch (error) {
+        console.error("Failed to load profile settings:", error);
       }
     };
 
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, setMode, setLanguage, mode, language]);
 
   // ================= NOTIFICATIONS =================
   const fetchNotifications = async () => {
@@ -149,13 +145,22 @@ const MainHeader: React.FC = () => {
 
   // ================= HELPERS =================
   const isActive = (path: string) => {
-    const active =
-      location.pathname === path ||
-      (path !== "/" && location.pathname.startsWith(path + "/"));
-
-    return active
-      ? "text-orange-600 dark:text-orange-400 font-semibold"
-      : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
+    // Special case: "/products" should not be active when on "/products/nearby"
+    if (path === "/products" && location.pathname === "/products/nearby") {
+      return "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
+    }
+    
+    // Check exact match first
+    if (location.pathname === path) {
+      return "text-orange-600 dark:text-orange-400 font-semibold";
+    }
+    
+    // For parent paths (excluding root), check if current path starts with them
+    if (path !== "/" && location.pathname.startsWith(path + "/")) {
+      return "text-orange-600 dark:text-orange-400 font-semibold";
+    }
+    
+    return "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
   };
 
   const displayName = useMemo(() => {
@@ -176,13 +181,50 @@ const MainHeader: React.FC = () => {
 
   const isSeller = profileSettings?.is_seller ?? false;
 
-  // Hapa header buttons NI FRONTEND ONLY (hakuna PATCH backend)
-  const handleChangeLanguage = (lang: "en" | "sw") => {
+  // Function to update backend when language changes
+  const handleChangeLanguage = async (lang: "en" | "sw") => {
+    console.log("Changing language to:", lang);
+    
+    // Update language locally immediately
     setLanguage(lang);
+    
+    // If user is logged in, update backend
+    if (user) {
+      try {
+        await apiClient.patch("/api/auth/settings/", {
+          preferred_language: lang,
+        });
+        console.log("Backend language updated successfully");
+      } catch (error) {
+        console.error("Failed to update language on backend:", error);
+        // Continue anyway - user can still use the language locally
+      }
+    }
   };
 
-  const handleChangeTheme = (newMode: ThemeMode) => {
+  // Function to update backend when theme changes
+  const handleChangeTheme = async (newMode: ThemeMode) => {
+    console.log("Changing theme to:", newMode);
+    
+    // Update theme locally immediately
     setMode(newMode);
+    
+    // If user is logged in, update backend
+    if (user) {
+      try {
+        const backendTheme = mapThemeModeToBackend(newMode);
+        console.log("Updating backend theme to:", backendTheme);
+        
+        await apiClient.patch("/api/auth/settings/", {
+          theme: backendTheme,
+        });
+        
+        console.log("Backend theme updated successfully");
+      } catch (error) {
+        console.error("Failed to update theme on backend:", error);
+        // Continue anyway - user can still use the theme locally
+      }
+    }
   };
 
   const handleLogout = async () => {
