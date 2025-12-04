@@ -339,6 +339,8 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
     search_fields = ["business_name", "description", "location__city"]
     ordering_fields = ["created_at", "rating", "total_sales"]
 
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
     def get_serializer_class(self):
         if self.action == "create":
             return SellerProfileCreateSerializer

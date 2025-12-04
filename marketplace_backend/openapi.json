@@ -3977,7 +3977,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileCreateRequest"
                             }
@@ -3987,7 +3987,7 @@
                                 "$ref": "#/components/schemas/SellerProfileCreateRequest"
                             }
                         },
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileCreateRequest"
                             }
@@ -4076,7 +4076,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileRequest"
                             }
@@ -4086,7 +4086,7 @@
                                 "$ref": "#/components/schemas/SellerProfileRequest"
                             }
                         },
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileRequest"
                             }
@@ -4134,7 +4134,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/PatchedSellerProfileRequest"
                             }
@@ -4144,7 +4144,7 @@
                                 "$ref": "#/components/schemas/PatchedSellerProfileRequest"
                             }
                         },
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/PatchedSellerProfileRequest"
                             }
@@ -6630,6 +6630,11 @@
                         "format": "uri",
                         "nullable": true
                     },
+                    "shop_image": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
                     "location": {
                         "$ref": "#/components/schemas/Location"
                     }
@@ -6656,6 +6661,11 @@
                         "maxLength": 20
                     },
                     "logo": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
+                    },
+                    "shop_image": {
                         "type": "string",
                         "format": "binary",
                         "nullable": true

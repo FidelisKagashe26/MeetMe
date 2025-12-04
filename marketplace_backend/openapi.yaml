@@ -2462,13 +2462,13 @@ paths:
       - sellers
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/SellerProfileCreateRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/SellerProfileCreateRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/SellerProfileCreateRequest'
         required: true
@@ -2520,13 +2520,13 @@ paths:
       - sellers
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/SellerProfileRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/SellerProfileRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/SellerProfileRequest'
         required: true
@@ -2554,13 +2554,13 @@ paths:
       - sellers
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedSellerProfileRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedSellerProfileRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/PatchedSellerProfileRequest'
       security:
@@ -4486,6 +4486,10 @@ components:
           type: string
           format: uri
           nullable: true
+        shop_image:
+          type: string
+          format: uri
+          nullable: true
         location:
           $ref: '#/components/schemas/Location'
       required:
@@ -4505,6 +4509,10 @@ components:
           type: string
           maxLength: 20
         logo:
+          type: string
+          format: binary
+          nullable: true
+        shop_image:
           type: string
           format: binary
           nullable: true

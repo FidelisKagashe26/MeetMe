@@ -412,7 +412,7 @@ class SellerProfileCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SellerProfile
-        fields = ["business_name", "description", "phone_number", "logo", "location"]
+        fields = ["business_name", "description", "phone_number", "logo", "shop_image", "location"]
 
     def create(self, validated_data):
         location_data = validated_data.pop("location")

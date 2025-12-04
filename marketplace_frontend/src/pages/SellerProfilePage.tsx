@@ -9,15 +9,17 @@ import GoogleMapPreview, { type LatLng } from "../components/GoogleMapPreview";
 import MainHeader from "../components/MainHeader";
 import MainFooter from "../components/MainFooter";
 
+// -------------------- TYPES --------------------
+
 interface LocationPayload {
   address: string;
   city: string;
-  state?: string;
+  state: string;
   country: string;
-  postal_code?: string;
+  postal_code: string;
   latitude: string;
   longitude: string;
-  mapbox_place_id?: string;
+  mapbox_place_id: string;
 }
 
 interface SellerProfilePayload {
@@ -25,8 +27,6 @@ interface SellerProfilePayload {
   description: string;
   phone_number: string;
   location: LocationPayload;
-  logo?: string; // URL/relative path from backend (non-file)
-  shop_image?: string; // URL/relative path ya picha ya nje (non-file)
 }
 
 interface SellerProfileResponse {
@@ -110,17 +110,18 @@ const getMainProductImage = (p: MyProduct): string | null => {
   );
 };
 
+// -------------------- COMPONENT --------------------
+
 const SellerProfilePage: React.FC = () => {
   const { user } = useAuth();
   const { language } = useLanguage();
   const isSw = language === "sw";
 
+  // -------- FORM STATE --------
   const [form, setForm] = useState<SellerProfilePayload>({
     business_name: "",
     description: "",
     phone_number: "",
-    logo: "",
-    shop_image: "",
     location: {
       address: "",
       city: "",
@@ -170,6 +171,8 @@ const SellerProfilePage: React.FC = () => {
     { id: "products", labelEn: "Products", labelSw: "Bidhaa" },
   ];
 
+  // -------- HANDLERS --------
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -195,11 +198,9 @@ const SellerProfilePage: React.FC = () => {
     const file = e.target.files?.[0] ?? null;
     if (!file) {
       setLogoFile(null);
+      // fallback: tumia kile kimetoka backend
       setLogoPreview(
-        sellerSummary?.logo_url ||
-          sellerSummary?.logo ||
-          form.logo ||
-          null,
+        sellerSummary?.logo_url || sellerSummary?.logo || null,
       );
       return;
     }
@@ -217,7 +218,6 @@ const SellerProfilePage: React.FC = () => {
       setShopImagePreview(
         sellerSummary?.shop_image_url ||
           sellerSummary?.shop_image ||
-          form.shop_image ||
           null,
       );
       return;
@@ -277,8 +277,8 @@ const SellerProfilePage: React.FC = () => {
     try {
       // ✅ API sahihi: seller wa current user
       const res = await apiClient.get<SellerProfileResponse>("/api/sellers/me/");
-
       const mine = res.data;
+
       setSellerId(mine.id);
       setSellerSummary(mine);
 
@@ -286,8 +286,6 @@ const SellerProfilePage: React.FC = () => {
         business_name: mine.business_name || "",
         description: mine.description || "",
         phone_number: mine.phone_number || "",
-        logo: mine.logo_url || mine.logo || "",
-        shop_image: mine.shop_image_url || mine.shop_image || "",
         location: {
           address: mine.location?.address || "",
           city: mine.location?.city || "",
@@ -308,6 +306,7 @@ const SellerProfilePage: React.FC = () => {
         profile: true,
         location: !!mine.location,
       }));
+
       void loadMyProducts(mine.id);
     } catch (err) {
       console.error(err);
@@ -405,12 +404,11 @@ const SellerProfilePage: React.FC = () => {
     setSuccess(null);
 
     try {
+      // ⚠️ HATUTUMI TENa logo/shop_image KAMA STRING KWENYE JSON
       const payload: SellerProfilePayload = {
         business_name: form.business_name,
         description: form.description,
         phone_number: form.phone_number,
-        logo: form.logo || undefined,
-        shop_image: form.shop_image || undefined,
         location: {
           address: form.location.address,
           city: form.location.city,
@@ -426,14 +424,14 @@ const SellerProfilePage: React.FC = () => {
       let baseSeller: SellerProfileResponse;
 
       if (sellerId) {
-        // ✅ UPDATE SELLER (JSON)
+        // ✅ UPDATE SELLER (JSON bila files)
         const res = await apiClient.put<SellerProfileResponse>(
           `/api/sellers/${sellerId}/`,
           payload,
         );
         baseSeller = res.data;
       } else {
-        // ✅ CREATE SELLER (JSON)
+        // ✅ CREATE SELLER (JSON bila files)
         const res = await apiClient.post<SellerProfileResponse>(
           "/api/sellers/",
           payload,
@@ -441,9 +439,9 @@ const SellerProfilePage: React.FC = () => {
         baseSeller = res.data;
       }
 
-      let finalSeller = baseSeller;
+      let finalSeller: SellerProfileResponse = baseSeller;
 
-      // ✅ PATCH LOGO file
+      // ✅ PATCH LOGO file (multipart/form-data)
       if (logoFile) {
         try {
           const fd = new FormData();
@@ -487,7 +485,7 @@ const SellerProfilePage: React.FC = () => {
         }
       }
 
-      // Sync state na seller wa mwisho (anayojumuisha logo na shop_image)
+      // Sync state na seller wa mwisho (anayojumuisha logo & shop_image)
       setSellerId(finalSeller.id);
       setSellerSummary(finalSeller);
       setForm((prev) => ({
@@ -495,14 +493,6 @@ const SellerProfilePage: React.FC = () => {
         business_name: finalSeller.business_name || prev.business_name,
         description: finalSeller.description || prev.description,
         phone_number: finalSeller.phone_number || prev.phone_number,
-        logo:
-          finalSeller.logo_url ||
-          finalSeller.logo ||
-          prev.logo,
-        shop_image:
-          finalSeller.shop_image_url ||
-          finalSeller.shop_image ||
-          prev.shop_image,
         location: {
           ...prev.location,
           address: finalSeller.location?.address || prev.location.address,
@@ -513,6 +503,7 @@ const SellerProfilePage: React.FC = () => {
             finalSeller.location?.postal_code || prev.location.postal_code,
           latitude: finalSeller.location?.latitude || prev.location.latitude,
           longitude: finalSeller.location?.longitude || prev.location.longitude,
+          mapbox_place_id: prev.location.mapbox_place_id,
         },
       }));
       setLogoPreview(finalSeller.logo_url || finalSeller.logo || null);
@@ -567,6 +558,8 @@ const SellerProfilePage: React.FC = () => {
     if (step === "location") return completed.location;
     return completed.products;
   };
+
+  // -------------------- RENDER --------------------
 
   if (!user) {
     return (
@@ -1083,7 +1076,9 @@ const SellerProfilePage: React.FC = () => {
 
                 {loadingProducts ? (
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isSw ? "Inapakia bidhaa zako..." : "Loading your products..."}
+                    {isSw
+                      ? "Inapakia bidhaa zako..."
+                      : "Loading your products..."}
                   </div>
                 ) : productsError ? (
                   <div className="text-[11px] text-red-600 bg-red-50 dark:bg-red-950/40 p-2 rounded border border-red-100 dark:border-red-900">
