@@ -1,9 +1,12 @@
 /* src/index.css */
 @import "tailwindcss";
 
+/* HII NDIO MUHIMU KWA TAILWIND v4 + .dark CLASS */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ===== GLOBAL BASE STYLES ===== */
 @layer base {
-  *,
+  * ,
   *::before,
   *::after {
     box-sizing: border-box;

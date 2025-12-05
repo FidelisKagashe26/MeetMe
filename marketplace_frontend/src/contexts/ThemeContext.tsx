@@ -10,12 +10,15 @@ import type { ThemeMode } from "../types/theme";
 import { THEME_STORAGE_KEY } from "../constants/theme";
 
 interface ThemeContextValue {
-  mode: ThemeMode; // "light" | "dark" | "auto"
+  mode: ThemeMode; // "light" | "dark" | "auto" (SYSTEM)
   setMode: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+// Initial mode:
+// - Jaribu kusoma kwenye localStorage
+// - Ikiwa hakuna, tumia "auto" (SYSTEM: mchana light, usiku dark)
 function getInitialMode(): ThemeMode {
   if (typeof window === "undefined") {
     return "light";
@@ -29,7 +32,7 @@ function getInitialMode(): ThemeMode {
     return stored;
   }
 
-  // default: AUTO => mchana light, usiku dark
+  // default: AUTO (SYSTEM) => mchana light, usiku dark
   return "auto";
 }
 
@@ -56,7 +59,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       } else if (mode === "dark") {
         effective = "dark";
       } else {
-        // AUTO: mchana 07:00–18:59 => light, usiku => dark
+        // AUTO (SYSTEM): mchana 07:00–18:59 => light, usiku => dark
         const hour = new Date().getHours();
         effective = hour >= 7 && hour < 19 ? "light" : "dark";
       }
@@ -70,10 +73,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    // Apply mara moja
+    // Tumia theme mara moja
     applyTheme();
 
-    // Kama mode ni "auto", check tena kila dakika 5 ili kubadilika kati ya mchana/usiku
+    // Kama mode ni "auto", check tena kila dakika 5 (ili kubadilisha kati ya mchana/usiku)
     if (mode === "auto") {
       intervalId = window.setInterval(applyTheme, 5 * 60 * 1000);
     }

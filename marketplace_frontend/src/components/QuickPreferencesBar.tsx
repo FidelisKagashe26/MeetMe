@@ -9,17 +9,23 @@ const QuickPreferencesBar: React.FC = () => {
 
   const isDark = mode === "dark";
 
+  const chipBase =
+    "inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/80 px-1 py-0.5";
+  const pillBase =
+    "px-2 py-0.5 rounded-full font-medium transition-colors";
+  const pillActive = "bg-orange-500 text-white";
+  const pillInactive = "text-slate-600 dark:text-slate-300";
+
   return (
     <div className="w-full flex items-center justify-end gap-2 px-3 py-1.5 text-[11px] bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200/70 dark:border-slate-800/70">
       {/* Language toggle */}
-      <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/80 px-1 py-0.5">
+      <div className={chipBase} role="group" aria-label="Language">
         <button
           type="button"
           onClick={() => setLanguage("en")}
-          className={`px-2 py-0.5 rounded-full font-medium ${
-            language === "en"
-              ? "bg-orange-500 text-white"
-              : "text-slate-600 dark:text-slate-300"
+          aria-pressed={language === "en"}
+          className={`${pillBase} ${
+            language === "en" ? pillActive : pillInactive
           }`}
         >
           EN
@@ -27,10 +33,9 @@ const QuickPreferencesBar: React.FC = () => {
         <button
           type="button"
           onClick={() => setLanguage("sw")}
-          className={`px-2 py-0.5 rounded-full font-medium ${
-            language === "sw"
-              ? "bg-orange-500 text-white"
-              : "text-slate-600 dark:text-slate-300"
+          aria-pressed={language === "sw"}
+          className={`${pillBase} ${
+            language === "sw" ? pillActive : pillInactive
           }`}
         >
           SW
@@ -38,15 +43,14 @@ const QuickPreferencesBar: React.FC = () => {
       </div>
 
       {/* Theme toggle: light / auto / dark */}
-      <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/80 px-1 py-0.5">
+      <div className={chipBase} role="group" aria-label="Theme">
         <button
           type="button"
           title="Light"
+          aria-pressed={mode === "light"}
           onClick={() => setMode("light")}
-          className={`px-2 py-0.5 rounded-full ${
-            mode === "light"
-              ? "bg-orange-500 text-white"
-              : "text-slate-600 dark:text-slate-300"
+          className={`${pillBase} ${
+            mode === "light" ? pillActive : pillInactive
           }`}
         >
           ☀
@@ -54,11 +58,10 @@ const QuickPreferencesBar: React.FC = () => {
         <button
           type="button"
           title="Auto (Day/Night)"
+          aria-pressed={mode === "auto"}
           onClick={() => setMode("auto")}
-          className={`px-2 py-0.5 rounded-full ${
-            mode === "auto"
-              ? "bg-orange-500 text-white"
-              : "text-slate-600 dark:text-slate-300"
+          className={`${pillBase} ${
+            mode === "auto" ? pillActive : pillInactive
           }`}
         >
           A
@@ -66,11 +69,10 @@ const QuickPreferencesBar: React.FC = () => {
         <button
           type="button"
           title="Dark"
+          aria-pressed={mode === "dark"}
           onClick={() => setMode("dark")}
-          className={`px-2 py-0.5 rounded-full ${
-            mode === "dark"
-              ? "bg-orange-500 text-white"
-              : "text-slate-600 dark:text-slate-300"
+          className={`${pillBase} ${
+            mode === "dark" ? pillActive : pillInactive
           }`}
         >
           {isDark ? "🌙" : "🌘"}

@@ -1,6 +1,7 @@
 // src/types/theme.ts
 
 // Mode inayotumiwa na frontend (ThemeContext + UI)
+// "auto" = SYSTEM mode (mchana light, usiku dark)
 export type ThemeMode = "light" | "dark" | "auto";
 
 // Mode inayotumiwa na backend (DRF /api/auth/settings/)
@@ -11,7 +12,7 @@ export function mapBackendThemeToMode(
   theme: BackendTheme | null | undefined,
 ): ThemeMode {
   if (!theme || theme === "system") {
-    // "system" tunai-mantiki kama "auto" (mchana light, usiku dark)
+    // "system" frontend side = "auto" (mchana light, usiku dark)
     return "auto";
   }
   return theme;
@@ -20,5 +21,6 @@ export function mapBackendThemeToMode(
 // Kutoka frontend mode kwenda backend (tunapost /api/auth/settings/)
 export function mapThemeModeToBackend(mode: ThemeMode): BackendTheme {
   if (mode === "light" || mode === "dark") return mode;
-  return "system"; // "auto" -> "system"
+  // "auto" (SYSTEM kwenye UI) → "system" kwa backend
+  return "system";
 }

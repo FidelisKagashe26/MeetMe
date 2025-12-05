@@ -6,8 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import apiClient from "../lib/apiClient";
 import { useTheme } from "../contexts/ThemeContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { FiSun } from "react-icons/fi";
-import { FiMoon } from "react-icons/fi";
+import { FiSun, FiMoon } from "react-icons/fi";
 import { LuMonitor } from "react-icons/lu";
 import { mapBackendThemeToMode } from "../types/theme";
 import type { ThemeMode, BackendTheme } from "../types/theme";
@@ -67,32 +66,37 @@ const MainHeader: React.FC = () => {
     null,
   );
 
+  // ================= LOAD PROFILE SETTINGS & SELLER =================
   useEffect(() => {
+    // Guest / not logged in
     if (!user) {
       setProfileSettings(null);
       setSellerProfile(null);
       setUnreadCount(0);
 
-      // For non-logged in users, tumia preference ya localStorage
-      const storedTheme = localStorage.getItem(
-        THEME_STORAGE_KEY,
-      ) as ThemeMode | null;
-      if (storedTheme && storedTheme !== mode) {
-        setMode(storedTheme);
-      }
+      if (typeof window !== "undefined") {
+        // For non-logged in users, tumia preference ya localStorage
+        const storedTheme = window.localStorage.getItem(
+          THEME_STORAGE_KEY,
+        ) as ThemeMode | null;
 
-      // Lugha pia tunaweza kuisoma kwenye localStorage kama umeihifadhi huko
-      const storedLanguage = localStorage.getItem("app_language");
-      if (
-        storedLanguage === "en" ||
-        storedLanguage === "sw"
-      ) {
-        setLanguage(storedLanguage);
+        if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "auto") {
+          if (storedTheme !== mode) {
+            setMode(storedTheme);
+          }
+        }
+
+        // Lugha pia tunaweza kuisoma kwenye localStorage
+        const storedLanguage = window.localStorage.getItem("app_language");
+        if (storedLanguage === "en" || storedLanguage === "sw") {
+          setLanguage(storedLanguage);
+        }
       }
 
       return;
     }
 
+    // Logged in: load settings + seller profile mara moja kwa kila login
     const load = async () => {
       try {
         const [settingsRes, sellerRes] = await Promise.allSettled([
@@ -105,17 +109,11 @@ const MainHeader: React.FC = () => {
           setProfileSettings(data);
 
           // Sync language from backend ON LOGIN (preference ya profile)
-          if (
-            data.preferred_language &&
-            data.preferred_language !== language
-          ) {
+          if (data.preferred_language && data.preferred_language !== language) {
             setLanguage(data.preferred_language);
 
             if (typeof window !== "undefined") {
-              window.localStorage.setItem(
-                "app_language",
-                data.preferred_language,
-              );
+              window.localStorage.setItem("app_language", data.preferred_language);
             }
           }
 
@@ -132,10 +130,7 @@ const MainHeader: React.FC = () => {
             setMode(newMode);
 
             if (typeof window !== "undefined") {
-              window.localStorage.setItem(
-                THEME_STORAGE_KEY,
-                newMode,
-              );
+              window.localStorage.setItem(THEME_STORAGE_KEY, newMode);
             }
           }
         }
@@ -149,7 +144,10 @@ const MainHeader: React.FC = () => {
     };
 
     void load();
-  }, [user, setMode, setLanguage, mode, language]);
+
+    // Hapa tunataka effect hii irun TU kila user akibadilika (login/logout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // ================= NOTIFICATIONS =================
   const fetchNotifications = async () => {
@@ -163,9 +161,7 @@ const MainHeader: React.FC = () => {
       const res = await apiClient.get<PaginatedNotificationResponse>(
         "/api/notifications/",
       );
-      const unread = (res.data.results || []).filter(
-        (n) => !n.is_read,
-      ).length;
+      const unread = (res.data.results || []).filter((n) => !n.is_read).length;
       setUnreadCount(unread);
     } catch {
       // ignore
@@ -202,9 +198,7 @@ const MainHeader: React.FC = () => {
   const displayName = useMemo(() => {
     if (!user) return "";
     if (user.first_name || user.last_name) {
-      return `${user.first_name || ""} ${
-        user.last_name || ""
-      }`.trim();
+      return `${user.first_name || ""} ${user.last_name || ""}`.trim();
     }
     return user.username;
   }, [user]);
@@ -223,7 +217,7 @@ const MainHeader: React.FC = () => {
 
   // ================= LANGUAGE / THEME SWITCHES =================
 
-  // Header language switch: haifanyi tena PATCH backend.
+  // Header language switch: haifanyi PATCH backend.
   // Backend ata-update language kwenye profile page (My Profile) peke yake.
   const handleChangeLanguage = (lang: "en" | "sw") => {
     console.log("Changing language to:", lang);
@@ -237,14 +231,12 @@ const MainHeader: React.FC = () => {
     }
   };
 
-  // Header theme switch: haifanyi tena PATCH backend.
+  // Header theme switch: haifanyi PATCH backend.
   // Backend ata-update theme kwenye profile page (My Profile) peke yake.
   const handleChangeTheme = (newMode: ThemeMode) => {
     console.log("Changing theme to:", newMode);
-
     setMode(newMode);
-    // ThemeProvider tayari inaandika THEME_STORAGE_KEY kwenye localStorage,
-    // kwa hiyo hatuhitaji kuandika tena hapa.
+    // ThemeProvider tayari inaandika THEME_STORAGE_KEY kwenye localStorage.
   };
 
   const handleLogout = async () => {
@@ -353,7 +345,7 @@ const MainHeader: React.FC = () => {
                     ? "border-orange-500 text-orange-500"
                     : "border-slate-200 dark:border-slate-700"
                 }`}
-                title="Auto (system / time)"
+                title="System (auto day/night)"
               >
                 <LuMonitor className="w-3.5 h-3.5" />
               </button>
@@ -422,18 +414,14 @@ const MainHeader: React.FC = () => {
                   to="/register"
                   className="px-3 py-1.5 rounded-full bg-orange-500 text-white text-[11px] font-medium hover:bg-orange-600 shadow-sm"
                 >
-                  {language === "sw"
-                    ? "Fungua akaunti"
-                    : "Create account"}
+                  {language === "sw" ? "Fungua akaunti" : "Create account"}
                 </Link>
               </div>
             ) : (
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() =>
-                    setDesktopProfileOpen((v) => !v)
-                  }
+                  onClick={() => setDesktopProfileOpen((v) => !v)}
                   className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-semibold overflow-hidden">
@@ -449,9 +437,7 @@ const MainHeader: React.FC = () => {
                   </div>
                   <div className="hidden sm:flex flex-col items-start leading-tight">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                      {language === "sw"
-                        ? "Umeingia kama"
-                        : "Logged in as"}
+                      {language === "sw" ? "Umeingia kama" : "Logged in as"}
                     </span>
                     <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-100 max-w-[140px] truncate">
                       {sellerName || displayName}
@@ -493,9 +479,7 @@ const MainHeader: React.FC = () => {
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                           {isSeller
                             ? sellerName ||
-                              (language === "sw"
-                                ? "Muuzaji"
-                                : "Seller")
+                              (language === "sw" ? "Muuzaji" : "Seller")
                             : language === "sw"
                             ? "Mnunuaji"
                             : "Buyer"}
@@ -651,9 +635,7 @@ const MainHeader: React.FC = () => {
                           </svg>
                         </span>
                         <span>
-                          {language === "sw"
-                            ? "Toka (Logout)"
-                            : "Logout"}
+                          {language === "sw" ? "Toka (Logout)" : "Logout"}
                         </span>
                       </button>
                     </div>
@@ -709,9 +691,7 @@ const MainHeader: React.FC = () => {
                   <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                     {isSeller
                       ? sellerName ||
-                        (language === "sw"
-                          ? "Muuzaji"
-                          : "Seller")
+                        (language === "sw" ? "Muuzaji" : "Seller")
                       : language === "sw"
                       ? "Mnunuaji"
                       : "Buyer"}
@@ -721,9 +701,7 @@ const MainHeader: React.FC = () => {
             ) : (
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {language === "sw"
-                    ? "Karibu LINKER"
-                    : "Welcome to LINKER"}
+                  {language === "sw" ? "Karibu LINKER" : "Welcome to LINKER"}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -744,9 +722,7 @@ const MainHeader: React.FC = () => {
                     }}
                     className="px-3 py-1.5 rounded-full bg-orange-500 text-white text-[11px] font-medium"
                   >
-                    {language === "sw"
-                      ? "Jisajili"
-                      : "Register"}
+                    {language === "sw" ? "Jisajili" : "Register"}
                   </button>
                 </div>
               </div>
@@ -766,9 +742,7 @@ const MainHeader: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`py-1.5 ${isActive("/products/nearby")}`}
               >
-                {language === "sw"
-                  ? "Bidhaa karibu"
-                  : "Near products"}
+                {language === "sw" ? "Bidhaa karibu" : "Near products"}
               </Link>
               <Link
                 to="/sellers"
@@ -782,10 +756,9 @@ const MainHeader: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`py-1.5 ${isActive("/seller-profile")}`}
               >
-                {language === "sw"
-                  ? "Uza kwenye LINKER"
-                  : "Sell on LINKER"}
+                {language === "sw" ? "Uza kwenye LINKER" : "Sell on LINKER"}
               </Link>
+
               {user && (
                 <button
                   type="button"
@@ -796,9 +769,7 @@ const MainHeader: React.FC = () => {
                   className="flex items-center justify-between py-1.5 text-slate-600 dark:text-slate-200"
                 >
                   <span>
-                    {language === "sw"
-                      ? "Arifa"
-                      : "Notifications"}
+                    {language === "sw" ? "Arifa" : "Notifications"}
                   </span>
                   {unreadCount > 0 && (
                     <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-[10px] text-white font-semibold">
@@ -808,6 +779,52 @@ const MainHeader: React.FC = () => {
                 </button>
               )}
             </nav>
+
+            {/* ACCOUNT LINKS (MOBILE): PROFILE + BUSINESS + CHANGE PASSWORD */}
+            {user && (
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-1 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("/account/profile");
+                  }}
+                  className="w-full text-left py-1.5 text-slate-600 dark:text-slate-200"
+                >
+                  {language === "sw"
+                    ? "Wasifu wa mtumiaji"
+                    : "My profile"}
+                </button>
+
+                {isSeller && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate("/seller-profile");
+                    }}
+                    className="w-full text-left py-1.5 text-slate-600 dark:text-slate-200"
+                  >
+                    {language === "sw"
+                      ? "Wasifu wa biashara"
+                      : "Business profile"}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("/account/change-password");
+                  }}
+                  className="w-full text-left py-1.5 text-slate-600 dark:text-slate-200"
+                >
+                  {language === "sw"
+                    ? "Badili neno la siri"
+                    : "Change password"}
+                </button>
+              </div>
+            )}
 
             {/* LANGUAGE + THEME (MOBILE) */}
             <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-1 space-y-1">
@@ -866,7 +883,7 @@ const MainHeader: React.FC = () => {
                         ? "border-orange-500 text-orange-500"
                         : "border-slate-200 dark:border-slate-700"
                     }`}
-                    title="Auto"
+                    title="System (auto day/night)"
                   >
                     <LuMonitor className="w-4 h-4" />
                   </button>
@@ -894,9 +911,7 @@ const MainHeader: React.FC = () => {
                   onClick={handleLogout}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 text-[11px] font-medium rounded-full"
                 >
-                  {language === "sw"
-                    ? "Toka (Logout)"
-                    : "Logout"}
+                  {language === "sw" ? "Toka (Logout)" : "Logout"}
                 </button>
               </div>
             )}
