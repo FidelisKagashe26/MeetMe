@@ -1,10 +1,12 @@
 // src/pages/NearbyProductsPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import apiClient from "../lib/apiClient";
+import apiClient from "../../lib/apiClient";
 import axios from "axios";
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
+import MainHeader from "../../components/MainHeader";
+import MainFooter from "../../components/MainFooter";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getNearbyProductsPageTexts } from "./nearbyProductsPageTexts";
 
 interface SellerLite {
   id?: number;
@@ -47,6 +49,22 @@ interface NearbyQueryParams {
 
 const PAGE_SIZE = 10;
 
+// ====== ERROR MESSAGE CONSTANTS (SW original) ======
+const GEO_ERROR_NO_SUPPORT = "Browser wako hauna support ya geolocation.";
+const GEO_ERROR_PERMISSION_DENIED =
+  "Umezima ruhusa ya location. Tafadhali ruhusu location kwenye browser ya LINKER.";
+const GEO_ERROR_GENERIC = "Imeshindikana kupata location ya kifaa.";
+const GEO_ERROR_NEED_LOCATION_FIRST =
+  "Hatukupata location ya kifaa chako bado. Hakikisha umeruhusu location kwenye kifaa chako na kwenye browser.";
+const GEO_ERROR_NO_SHOP_COORDS =
+  "Hatuna coordinates kamili za duka hili kwa sasa.";
+const GEO_ERROR_INVALID_SHOP_COORDS =
+  "Coordinates za duka hili sio sahihi.";
+const GEO_ERROR_NO_COORDS_LIST =
+  "Hatuna coordinates za maduka haya kwa sasa kuonyesha kwenye ramani.";
+
+const API_ERROR_GENERIC = "Imeshindikana kutafuta bidhaa karibu.";
+
 // helper: geuza distance kuwa number salama
 const getNumericDistanceKm = (product: Product): number | null => {
   const raw = product.distance_km ?? product.distance ?? null;
@@ -60,19 +78,6 @@ const getNumericDistanceKm = (product: Product): number | null => {
   return parsed;
 };
 
-// helper: score ya ukaribu 1–10 (1 = karibu sana)
-const getProximityScore = (
-  distance: number | null,
-  min: number | null,
-  max: number | null,
-): number | null => {
-  if (distance === null || min === null || max === null) return null;
-  if (max <= min) return 1;
-  const normalized = (distance - min) / (max - min); // 0..1
-  const score = Math.round(normalized * 9) + 1; // 1..10
-  return Math.min(10, Math.max(1, score));
-};
-
 interface ShopChip {
   key: string;
   name: string;
@@ -80,10 +85,16 @@ interface ShopChip {
 }
 
 const NearbyProductsPage: React.FC = () => {
+  const { language } = useLanguage();
+  const texts = getNearbyProductsPageTexts(language);
+
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null,
   );
-  const [radius, setRadius] = useState<number>(10); // km
+  const [radius] = useState<number>(10); // km – tunaitumia kwa backend tu, hatuonyeshi user
+
+  // searchInput = anachoandika kwenye box, searchTerm = kinachotumika kufilter baada ya kubonyeza Search
+  const [searchInput, setSearchInput] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -99,12 +110,12 @@ const NearbyProductsPage: React.FC = () => {
 
   const [page, setPage] = useState<number>(1);
 
-  // ====== GET BROWSER LOCATION ======
+  // ====== GET BROWSER LOCATION (auto on mount) ======
   const askLocation = () => {
     setLocationError(null);
 
     if (!navigator.geolocation) {
-      setLocationError("Browser wako hauna support ya geolocation.");
+      setLocationError(GEO_ERROR_NO_SUPPORT);
       return;
     }
 
@@ -116,17 +127,15 @@ const NearbyProductsPage: React.FC = () => {
       (err) => {
         console.error("Geolocation error:", err);
         if (err.code === err.PERMISSION_DENIED) {
-          setLocationError(
-            "Umezima ruhusa ya location. Fungua settings za browser kuruhusu location kwa LINKA.",
-          );
+          setLocationError(GEO_ERROR_PERMISSION_DENIED);
         } else {
-          setLocationError("Imeshindikana kupata location ya kifaa.");
+          setLocationError(GEO_ERROR_GENERIC);
         }
       },
     );
   };
 
-  // mara ya kwanza kabisa, jaribu kuchukua location
+  // mara ya kwanza kabisa, jaribu kuchukua location moja kwa moja
   useEffect(() => {
     askLocation();
   }, []);
@@ -143,7 +152,7 @@ const NearbyProductsPage: React.FC = () => {
         params: {
           lat: params.lat,
           lng: params.lng,
-          // Nearby page tunaMALIZA na radius – hapa ndio tunaituma makusudi
+          // Nearby page tunaMALIZA na radius – tunaituma hapa tu (user haioni)
           radius: params.radius ?? radius,
         },
       });
@@ -159,17 +168,17 @@ const NearbyProductsPage: React.FC = () => {
         if (data && typeof data === "object") {
           setError(JSON.stringify(data));
         } else {
-          setError("Imeshindikana kutafuta bidhaa karibu.");
+          setError(API_ERROR_GENERIC);
         }
       } else {
-        setError("Imeshindikana kutafuta bidhaa karibu.");
+        setError(API_ERROR_GENERIC);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // kila tukipata coords mpya au radius ibadilike → tafuta karibu
+  // kila tukipata coords mpya → tafuta karibu
   useEffect(() => {
     if (coords) {
       void fetchNearby({ lat: coords.lat, lng: coords.lng });
@@ -177,7 +186,14 @@ const NearbyProductsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords, radius]);
 
-  // filter ndogo ya client-side kwa search box
+  // ====== SEARCH (si auto – mpaka abofye Search) ======
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchTerm(searchInput.trim());
+    setPage(1);
+  };
+
+  // filter ndogo ya client-side kwa searchTerm (iliyothibitishwa kwa kubonyeza Search)
   const filteredProducts = products.filter((p) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
@@ -188,20 +204,7 @@ const NearbyProductsPage: React.FC = () => {
     );
   });
 
-  // distance stats kwa scale 1–10
-  const numericDistances = filteredProducts
-    .map((p) => getNumericDistanceKm(p))
-    .filter((d): d is number => d !== null);
-
-  let minDistance: number | null = null;
-  let maxDistance: number | null = null;
-
-  if (numericDistances.length > 0) {
-    minDistance = Math.min(...numericDistances);
-    maxDistance = Math.max(...numericDistances);
-  }
-
-  // pangilia bidhaa kwa ukaribu (karibu → mbali)
+  // pangilia bidhaa kwa ukaribu (karibu → mbali) bila kumwonyesha user kilometa
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     const da = getNumericDistanceKm(a);
     const db = getNumericDistanceKm(b);
@@ -247,9 +250,7 @@ const NearbyProductsPage: React.FC = () => {
 
   const handleOpenMapAll = () => {
     if (!coords) {
-      setLocationError(
-        "Hatukupata location ya kifaa chako bado. Bonyeza 'Tumia location yangu' kwanza.",
-      );
+      setLocationError(GEO_ERROR_NEED_LOCATION_FIRST);
       return;
     }
 
@@ -268,9 +269,7 @@ const NearbyProductsPage: React.FC = () => {
       .filter((val): val is string => val !== null);
 
     if (points.length === 0) {
-      setLocationError(
-        "Hatuna coordinates za maduka haya kwa sasa kuonyesha kwenye ramani.",
-      );
+      setLocationError(GEO_ERROR_NO_COORDS_LIST);
       return;
     }
 
@@ -302,16 +301,14 @@ const NearbyProductsPage: React.FC = () => {
 
   const handleNavigateToShop = (product: Product) => {
     if (!coords) {
-      setLocationError(
-        "Hatukupata location ya kifaa chako bado. Bonyeza 'Tumia location yangu' kwanza.",
-      );
+      setLocationError(GEO_ERROR_NEED_LOCATION_FIRST);
       return;
     }
 
     const lat = product.latitude;
     const lng = product.longitude;
     if (lat == null || lng == null) {
-      setLocationError("Hatuna coordinates kamili za duka hili kwa sasa.");
+      setLocationError(GEO_ERROR_NO_SHOP_COORDS);
       return;
     }
 
@@ -319,7 +316,7 @@ const NearbyProductsPage: React.FC = () => {
     const lngNum = typeof lng === "number" ? lng : parseFloat(lng);
 
     if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
-      setLocationError("Coordinates za duka hili sio sahihi.");
+      setLocationError(GEO_ERROR_INVALID_SHOP_COORDS);
       return;
     }
 
@@ -356,105 +353,111 @@ const NearbyProductsPage: React.FC = () => {
     ? `https://www.google.com/maps?q=${mapCenter.lat},${mapCenter.lng}&z=14&output=embed`
     : null;
 
+  const getLocationErrorText = () => {
+    if (!locationError) return null;
+    switch (locationError) {
+      case GEO_ERROR_NO_SUPPORT:
+        return texts.geolocationNoSupport;
+      case GEO_ERROR_PERMISSION_DENIED:
+        return texts.geolocationPermissionDenied;
+      case GEO_ERROR_GENERIC:
+        return texts.geolocationGenericError;
+      case GEO_ERROR_NEED_LOCATION_FIRST:
+        return texts.locationNeededForMap;
+      case GEO_ERROR_NO_SHOP_COORDS:
+        return texts.noCoordinatesForShop;
+      case GEO_ERROR_INVALID_SHOP_COORDS:
+        return texts.invalidCoordinatesForShop;
+      case GEO_ERROR_NO_COORDS_LIST:
+        return texts.noCoordinatesForList;
+      default:
+        return locationError;
+    }
+  };
+
+  const getErrorText = () => {
+    if (!error) return null;
+    if (error === API_ERROR_GENERIC) {
+      return texts.apiGenericError;
+    }
+    return error;
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
       <MainHeader />
 
       {/* MAIN */}
       <main className="flex-1 max-w-6xl mx-auto py-6 px-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-xl font-semibold mb-1 text-slate-900 dark:text-slate-100">
-              Bidhaa karibu na ulipo
-            </h2>
-            <p className="text-xs text-slate-600 dark:text-slate-400">
-              Tunatumia location ya kifaa chako (GPS / browser) kuonyesha bidhaa
-              za karibu. Hatuhifadhi point zako za ramani, tunazitumia kwa
-              uonyeshaji tu.
-            </p>
-          </div>
+        {/* BACK LINK TOP */}
+        <div className="mb-2">
           <Link
             to="/products"
             className="text-[11px] text-orange-600 hover:underline"
           >
-            ← Rudi kwenye bidhaa zote
+            {texts.backToAllProducts}
           </Link>
         </div>
 
-        {/* LOCATION & FILTER BAR */}
+        <div className="flex items-start justify-between mb-4 gap-3">
+          <div>
+            <h2 className="text-xl font-semibold mb-1 text-slate-900 dark:text-slate-100">
+              {texts.pageTitle}
+            </h2>
+            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-xl">
+              {texts.pageSubtitle}
+            </p>
+          </div>
+        </div>
+
+        {/* LOCATION & SEARCH BAR */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow border border-slate-200 dark:border-slate-800 p-4 mb-6 space-y-3">
-          <div className="flex flex-wrap items-center gap-3 justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={askLocation}
-                className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-medium hover:bg-black dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-              >
-                Tumia location yangu
-              </button>
-
-              <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                <label htmlFor="radius" className="whitespace-nowrap">
-                  Radius:
-                </label>
-                <select
-                  id="radius"
-                  value={radius}
-                  onChange={(e) => {
-                    setRadius(parseInt(e.target.value, 10));
-                    setPage(1);
-                  }}
-                  className="border rounded px-2 py-1 text-[11px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500/70"
-                >
-                  <option value={5}>5 km</option>
-                  <option value={10}>10 km</option>
-                  <option value={20}>20 km</option>
-                  <option value={50}>50 km</option>
-                </select>
-              </div>
-
-              {coords && (
-                <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                  Lat: {coords.lat.toFixed(4)}, Lng: {coords.lng.toFixed(4)}
-                </div>
-              )}
+          <form
+            onSubmit={handleSearchSubmit}
+            className="flex flex-col sm:flex-row gap-3 items-stretch"
+          >
+            <div className="flex-1">
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                {texts.searchLabel}
+              </label>
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder={texts.searchPlaceholder}
+                className="w-full border rounded-full px-3 py-1.5 text-[11px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/70"
+              />
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-none sm:w-64">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Tafuta ndani ya matokeo (jina la bidhaa / duka)..."
-                  className="w-full border rounded-full px-3 py-1.5 text-[11px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/70"
-                />
-              </div>
+            <div className="flex items-end gap-2">
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded-full bg-orange-500 text-white text-[11px] font-semibold hover:bg-orange-400 shadow-sm"
+              >
+                {texts.searchButton}
+              </button>
 
               {/* Button ya kufungua ramani kama modal kwa mobile */}
               <button
                 type="button"
                 onClick={() => setIsMapModalOpen(true)}
                 disabled={!coords && !hasAnyCoords}
-                className="lg:hidden px-3 py-1.5 rounded-full border text-[11px] font-medium border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="sm:hidden px-3 py-1.5 rounded-full border text-[11px] font-medium border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Fungua ramani
+                {texts.openMapMobileButton}
               </button>
             </div>
-          </div>
+          </form>
 
-          {locationError && (
+          {getLocationErrorText() && (
             <div className="text-[11px] text-red-600 bg-red-50 dark:bg-red-950/60 dark:text-red-300 border border-red-100 dark:border-red-800 px-3 py-2 rounded">
-              {locationError}
+              {getLocationErrorText()}
             </div>
           )}
 
-          {error && (
+          {getErrorText() && (
             <div className="text-[11px] text-red-600 bg-red-50 dark:bg-red-950/60 dark:text-red-300 border border-red-100 dark:border-red-800 px-3 py-2 rounded">
-              {error}
+              {getErrorText()}
             </div>
           )}
         </div>
@@ -467,12 +470,10 @@ const NearbyProductsPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Ramani ya maduka karibu
+                    {texts.mapPanelTitle}
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Bonyeza duka lolote upande wa kulia kuona location yake
-                    katika ramani hii, au tumia &quot;Anza safari&quot; kuanza
-                    directions za Google Maps.
+                    {texts.mapPanelDescription}
                   </p>
                 </div>
               </div>
@@ -505,7 +506,7 @@ const NearbyProductsPage: React.FC = () => {
                   disabled={!coords || !hasAnyCoords}
                   className="px-3 py-1.5 rounded-full border text-[11px] font-medium border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Fungua Google Maps (maduka yote kwenye page hii)
+                  {texts.mapOpenAllButton}
                 </button>
               </div>
 
@@ -521,8 +522,7 @@ const NearbyProductsPage: React.FC = () => {
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-[11px] text-slate-500 dark:text-slate-400 px-4">
-                    Hakuna data ya ramani bado. Hakikisha location yako
-                    imepatikana na kuna maduka yenye coordinates.
+                    {texts.mapPanelNoData}
                   </div>
                 )}
               </div>
@@ -533,32 +533,26 @@ const NearbyProductsPage: React.FC = () => {
           <div className="lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-1">
             {loading && (
               <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Inatafuta bidhaa karibu na ulipo...
+                {texts.loadingText}
               </div>
             )}
 
             {!loading && sortedProducts.length === 0 && !error && (
               <div className="text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3">
-                Hakuna matokeo bado. Hakikisha location imewashwa kisha jaribu
-                tena au panua radius.
+                {texts.noResultsText}
               </div>
             )}
 
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1">
               {paginatedProducts.map((product) => {
-                const numericDistance = getNumericDistanceKm(product);
-                const proximityScore = getProximityScore(
-                  numericDistance,
-                  minDistance,
-                  maxDistance,
-                );
-
                 const sellerId = product.seller?.id;
                 const shopName = product.seller?.business_name;
 
                 const productImage = product.image_url || product.image || null;
                 const shopImage =
-                  product.seller?.shop_image_url || product.seller?.shop_image || null;
+                  product.seller?.shop_image_url ||
+                  product.seller?.shop_image ||
+                  null;
                 const mainImage = productImage || shopImage;
 
                 const city =
@@ -576,14 +570,16 @@ const NearbyProductsPage: React.FC = () => {
                   >
                     <div className="relative mb-3">
                       {mainImage ? (
-                        <img
-                          src={mainImage}
-                          alt={product.name}
-                          className="w-full h-40 object-cover rounded-xl"
-                        />
+                        <div className="w-full h-44 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden">
+                          <img
+                            src={mainImage}
+                            alt={product.name}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
                       ) : (
-                        <div className="w-full h-40 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[11px] text-slate-400 dark:text-slate-500">
-                          Hakuna picha
+                        <div className="w-full h-44 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[11px] text-slate-400 dark:text-slate-500">
+                          {texts.noImage}
                         </div>
                       )}
 
@@ -609,17 +605,14 @@ const NearbyProductsPage: React.FC = () => {
                     </p>
 
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-2 space-y-1">
-                      {shopName && <div>Seller: {shopName}</div>}
-                      {city && <div>Mji: {city}</div>}
-                      {proximityScore !== null && (
+                      {shopName && (
                         <div>
-                          Ukaribu:{" "}
-                          <span className="font-semibold">
-                            {proximityScore}/10
-                          </span>{" "}
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            (1 = karibu sana)
-                          </span>
+                          {texts.sellerLabel}: {shopName}
+                        </div>
+                      )}
+                      {city && (
+                        <div>
+                          {texts.cityLabel}: {city}
                         </div>
                       )}
                     </div>
@@ -635,7 +628,7 @@ const NearbyProductsPage: React.FC = () => {
                         to={`/products/${product.id}`}
                         className="px-3 py-1.5 rounded-full bg-slate-900 text-white font-medium hover:bg-black dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                       >
-                        View details
+                        {texts.cardViewDetails}
                       </Link>
 
                       <div className="flex flex-wrap gap-2">
@@ -644,7 +637,7 @@ const NearbyProductsPage: React.FC = () => {
                             to={`/shops/${sellerId}`}
                             className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                           >
-                            Visit shop
+                            {texts.cardVisitShop}
                           </Link>
                         )}
 
@@ -659,14 +652,14 @@ const NearbyProductsPage: React.FC = () => {
                               }}
                               className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
-                              Onyesha kwenye ramani
+                              {texts.cardShowOnMap}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleNavigateToShop(product)}
                               className="px-3 py-1.5 rounded-full bg-orange-500 text-white font-medium hover:bg-orange-400"
                             >
-                              Anza safari
+                              {texts.cardStartDirections}
                             </button>
                           </>
                         )}
@@ -686,10 +679,10 @@ const NearbyProductsPage: React.FC = () => {
                   disabled={currentPage === 1}
                   className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Prev
+                  {texts.paginationPrev}
                 </button>
                 <span>
-                  Page {currentPage} / {totalPages}
+                  {texts.paginationPageLabel(currentPage, totalPages)}
                 </span>
                 <button
                   type="button"
@@ -699,7 +692,7 @@ const NearbyProductsPage: React.FC = () => {
                   disabled={currentPage === totalPages}
                   className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Next
+                  {texts.paginationNext}
                 </button>
               </div>
             )}
@@ -716,10 +709,10 @@ const NearbyProductsPage: React.FC = () => {
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
               <div>
                 <h3 className="text-sm font-semibold">
-                  Ramani ya maduka karibu
+                  {texts.mobileMapTitle}
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Unaoonekana kama dot ya “current location” kwenye ramani.
+                  {texts.mobileMapSubtitle}
                 </p>
               </div>
               <button
@@ -727,7 +720,7 @@ const NearbyProductsPage: React.FC = () => {
                 onClick={() => setIsMapModalOpen(false)}
                 className="text-xs text-slate-300 hover:text-white"
               >
-                Funga
+                {texts.mobileMapCloseTop}
               </button>
             </div>
 
@@ -742,8 +735,7 @@ const NearbyProductsPage: React.FC = () => {
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-[11px] text-slate-400 px-4">
-                  Hakuna data ya ramani bado. Hakikisha location imepatikana na
-                  kuna maduka yenye coordinates.
+                  {texts.mapPanelNoData}
                 </div>
               )}
             </div>
@@ -755,14 +747,14 @@ const NearbyProductsPage: React.FC = () => {
                 disabled={!coords || !hasAnyCoords}
                 className="flex-1 px-3 py-1.5 rounded-full bg-orange-500 text-xs font-semibold text-white hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Fungua Google Maps (maduka yote kwenye page hii)
+                {texts.mapOpenAllButtonMobile}
               </button>
               <button
                 type="button"
                 onClick={() => setIsMapModalOpen(false)}
                 className="px-3 py-1.5 rounded-full border border-slate-600 text-[11px] text-slate-200 hover:bg-slate-800"
               >
-                Funga
+                {texts.mobileMapCloseBottom}
               </button>
             </div>
           </div>
