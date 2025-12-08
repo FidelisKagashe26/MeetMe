@@ -40,6 +40,11 @@ export interface ProductsPageTexts {
   noGeoSupport: string;
   couldNotGetLocation: string;
 
+  // NEW: detailed geolocation error messages
+  geoPermissionDenied: string;
+  geoPositionUnavailable: string;
+  geoTimeout: string;
+
   searchButton: string;
 
   filtersTitle: string;
@@ -117,6 +122,13 @@ const productsPageTexts: Record<"en" | "sw", ProductsPageTexts> = {
 
     noGeoSupport: "Your browser does not support geolocation.",
     couldNotGetLocation: "Could not get your location. Please try again.",
+
+    geoPermissionDenied:
+      "We couldn't access your location. Please allow location access in your browser and try again.",
+    geoPositionUnavailable:
+      "Your location is temporarily unavailable. Try again from an area with better signal or internet.",
+    geoTimeout:
+      "It took too long to get your location. Please try again or type your area manually.",
 
     searchButton: "Search",
 
@@ -198,6 +210,13 @@ const productsPageTexts: Record<"en" | "sw", ProductsPageTexts> = {
       "Kivinjari chako hakiruhusu kutambua eneo ulipo kwa sasa.",
     couldNotGetLocation:
       "Hatukuweza kupata eneo lako. Tafadhali jaribu tena.",
+
+    geoPermissionDenied:
+      "Hatukupewa ruhusa ya kutambua eneo lako. Ruhusu location kwenye kivinjari chako kisha jaribu tena.",
+    geoPositionUnavailable:
+      "Eneo lako halijapatikana kwa sasa. Jaribu tena ukiwa kwenye eneo lenye mtandao au GPS bora.",
+    geoTimeout:
+      "Imeshachukua muda mrefu kutafuta eneo lako. Jaribu tena au andika eneo lako kwenye kisanduku.",
 
     searchButton: "Tafuta",
 

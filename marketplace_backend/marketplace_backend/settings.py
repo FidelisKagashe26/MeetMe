@@ -189,6 +189,7 @@ MAPBOX_ACCESS_TOKEN = env('MAPBOX_ACCESS_TOKEN', default='')
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
-        # kwa production tutaweka channels_redis hapa
     }
 }
+
+GOOGLE_MAPS_API_KEY = "AIzaSyAOfPTBgEhSHKr1hpUZCe-1LHvHKDceygI"

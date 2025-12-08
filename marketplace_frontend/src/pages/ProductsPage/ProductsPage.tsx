@@ -101,6 +101,18 @@ const ProductsPage: React.FC = () => {
   // Geolocation (raw)
   const [coords, setCoords] = useState<Coords | null>(null);
   const [geoLoading, setGeoLoading] = useState<boolean>(false);
+  /**
+   * geoError sasa tunahifadhi kama CODE (mf. "PERMISSION_DENIED") badala ya message ya moja kwa moja,
+   * ili tuweze kuitafsiri vizuri kwenye texts (EN/SW).
+   *
+   * Inaweza kuwa:
+   * - "NO_GEO_SUPPORT"
+   * - "PERMISSION_DENIED"
+   * - "POSITION_UNAVAILABLE"
+   * - "TIMEOUT"
+   * - "UNKNOWN"
+   * - au message nyingine ya raw (fallback).
+   */
   const [geoError, setGeoError] = useState<string | null>(null);
 
   // Active filters (haya tunayoyatuma API)
@@ -130,6 +142,43 @@ const ProductsPage: React.FC = () => {
 
     return null;
   };
+
+  /**
+   * Helper: omba location ya browser kwa Promise, na tumia options
+   * zinazopunguza kusubiri sana (timeout) na kuruhusu cache ya hadi 60s (maximumAge).
+   */
+  const requestBrowserLocation = useCallback(
+    () =>
+      new Promise<Coords>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          // Hakuna support ya geolocation
+          reject(new Error("NO_GEO_SUPPORT"));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+          },
+          (err) => {
+            reject(err);
+          },
+          {
+            // Hatuhitaji accuracy ya GPS ya mita chache sana, hivyo
+            // high accuracy = false ili iwe haraka na isitumie sana battery
+            enableHighAccuracy: false,
+            // Acha maximum ~10s kabla ya kutoa TIMEOUT
+            timeout: 10000,
+            // Ruhusu kutumia location ya hadi 60s iliyopita ili iwe haraka
+            maximumAge: 60000,
+          },
+        );
+      }),
+    [],
+  );
 
   /**
    * Fetch products kutoka API
@@ -175,7 +224,9 @@ const ProductsPage: React.FC = () => {
   }, [fetchProducts]);
 
   /**
-   * Submit ya search form
+   * Submit ya search form (manual query + location ya maandishi).
+   * Kama tayari tumechukua coords, tunaziweka pia kwenye activeCoords
+   * ili backend ipange kwa distance.
    */
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,37 +237,65 @@ const ProductsPage: React.FC = () => {
   };
 
   /**
-   * Geolocation
+   * Geolocation:
+   * - Bonyeza "Use my location / Tumia eneo nilipo"
+   * - Inajaribu kuchukua location haraka na kwa uhakika zaidi
+   * - Ikifanikiwa → ina-set activeCoords + activeLocation="Current location"
+   *   ili bidhaa zirudi zikiwa zimesortiwa kwa distance kutoka kwa user.
    */
-  const handleUseMyLocation = () => {
+  const handleUseMyLocation = async () => {
+    // Hakuna geolocation kabisa
     if (!navigator.geolocation) {
-      // tunahifadhi message ya asili, lakini tutamwonyesha mteja tafsiri
-      setGeoError("Your browser does not support geolocation.");
+      setGeoError("NO_GEO_SUPPORT");
       return;
     }
 
     setGeoError(null);
     setGeoLoading(true);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const nextCoords: Coords = { lat: latitude, lng: longitude };
-        setCoords(nextCoords);
+    try {
+      const nextCoords = await requestBrowserLocation();
 
-        if (!locationText) {
-          setLocationText("Current location");
+      setCoords(nextCoords);
+      // Weka active filters moja kwa moja ili fetchProducts iingie kazini through useEffect
+      setActiveCoords(nextCoords);
+      setLocationText("Current location");
+      setActiveLocation("Current location");
+      setPage(1);
+    } catch (err: unknown) {
+      console.error(err);
+
+      // Tofautisha aina za errors za geolocation
+      if (err instanceof Error && err.message === "NO_GEO_SUPPORT") {
+        setGeoError("NO_GEO_SUPPORT");
+      } else if (
+        typeof err === "object" &&
+        err !== null &&
+        "code" in err &&
+        typeof (err as GeolocationPositionError).code === "number"
+      ) {
+        const geoErr = err as GeolocationPositionError;
+
+        switch (geoErr.code) {
+          case geoErr.PERMISSION_DENIED:
+            setGeoError("PERMISSION_DENIED");
+            break;
+          case geoErr.POSITION_UNAVAILABLE:
+            setGeoError("POSITION_UNAVAILABLE");
+            break;
+          case geoErr.TIMEOUT:
+            setGeoError("TIMEOUT");
+            break;
+          default:
+            setGeoError("UNKNOWN");
+            break;
         }
-
-        setGeoLoading(false);
-      },
-      (err) => {
-        console.error(err);
-        // tunahifadhi message ya asili, lakini tutamwonyesha mteja tafsiri
-        setGeoError("Could not get your location. Please try again.");
-        setGeoLoading(false);
-      },
-    );
+      } else {
+        setGeoError("UNKNOWN");
+      }
+    } finally {
+      setGeoLoading(false);
+    }
   };
 
   const handleClearLocation = () => {
@@ -318,15 +397,27 @@ const ProductsPage: React.FC = () => {
     startIndex + PAGE_SIZE,
   );
 
-  // Tafsiri ya geoError kulingana na message ya asili
+  // Tafsiri ya geoError kulingana na CODE tuliyohifadhi
   const getGeoErrorText = () => {
     if (!geoError) return null;
-    if (geoError === "Your browser does not support geolocation.") {
+
+    if (geoError === "NO_GEO_SUPPORT") {
       return texts.noGeoSupport;
     }
-    if (geoError === "Could not get your location. Please try again.") {
+    if (geoError === "PERMISSION_DENIED") {
+      return texts.geoPermissionDenied;
+    }
+    if (geoError === "POSITION_UNAVAILABLE") {
+      return texts.geoPositionUnavailable;
+    }
+    if (geoError === "TIMEOUT") {
+      return texts.geoTimeout;
+    }
+    if (geoError === "UNKNOWN") {
       return texts.couldNotGetLocation;
     }
+
+    // fallback kama tukipata string nyingine ya raw
     return geoError;
   };
 
@@ -449,7 +540,9 @@ const ProductsPage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  onClick={handleUseMyLocation}
+                  onClick={() => {
+                    void handleUseMyLocation();
+                  }}
                   disabled={geoLoading}
                   className="whitespace-nowrap px-3 py-2 rounded-xl border border-orange-500 text-orange-600 dark:text-orange-400 text-[11px] font-medium bg-white dark:bg-slate-950 hover:bg-orange-50 dark:hover:bg-orange-500/10 disabled:opacity-60"
                 >

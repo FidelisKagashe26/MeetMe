@@ -1,3 +1,4 @@
+# api/views.py
 from decimal import Decimal
 
 from django.contrib.auth import authenticate
@@ -72,6 +73,7 @@ from .utils import (
     filter_by_radius,
     sort_by_distance,
     add_distance_to_queryset,
+    GoogleMapsDistanceError,
 )
 
 
@@ -378,7 +380,7 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def nearby(self, request):
         """
-        Get nearby sellers based on user's location (Haversine)
+        Get nearby sellers based on user's location (Google Distance Matrix)
 
         - Hakuna tena LIMIT ya idadi ya maduka.
         - Kama `radius` imepelekwa → tunatumia filter_by_radius (km).
@@ -409,23 +411,29 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
             self.queryset.filter(location__isnull=False)
         )
 
-        # Kama radius ipo → tutumie radius
-        if radius_param is not None:
-            try:
-                radius = float(radius_param)
-            except ValueError:
-                return Response(
-                    {"error": "Invalid radius value"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        try:
+            # Kama radius ipo → tutumie radius
+            if radius_param is not None:
+                try:
+                    radius = float(radius_param)
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid radius value"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-            if radius <= 0:
-                radius = 10.0
+                if radius <= 0:
+                    radius = 10.0
 
-            sellers = filter_by_radius(sellers_qs, lat, lon, radius)
-        else:
-            # Hakuna radius → pangilia wote kwa distance tu
-            sellers = add_distance_to_queryset(sellers_qs, lat, lon)
+                sellers = filter_by_radius(sellers_qs, lat, lon, radius)
+            else:
+                # Hakuna radius → pangilia wote kwa distance tu
+                sellers = add_distance_to_queryset(sellers_qs, lat, lon)
+        except GoogleMapsDistanceError as exc:
+            return Response(
+                {"error": f"Google Maps error: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # panga karibu → mbali
         sellers = sort_by_distance(sellers)
@@ -436,7 +444,6 @@ class SellerProfileViewSet(viewsets.ModelViewSet):
             context={"request": request},
         )
         return Response(serializer.data)
-
 
     @action(detail=True, methods=["get"])
     def products(self, request, pk=None):
@@ -496,8 +503,9 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     MUHIMU:
     - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-    - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
-      kwa ukaribu (distance asc) bila kuweka limit ya radius.
+    - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
+      Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
+      kuweka limit ya radius.
     - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
       imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
       kama filter ili isilete EMPTY results.
@@ -575,8 +583,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         /api/products/
 
         - Inatumia filters za kawaida (search, category, price, location ya mji).
-        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,
-          inapanga kwa distance ASC bila ku-cut off kwa radius.
+        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product
+          kwa kutumia Google Distance Matrix, inapanga kwa distance ASC
+          bila ku-cut off kwa radius.
         - Inarudisha ARRAY tu, hakuna pagination ya backend.
         """
         # apply SearchFilter, OrderingFilter, na get_queryset filters
@@ -585,20 +594,28 @@ class ProductViewSet(viewsets.ModelViewSet):
         lat = request.query_params.get("lat") or request.query_params.get("latitude")
         lon = request.query_params.get("lng") or request.query_params.get("longitude")
 
-        items = list(base_qs)
+        try:
+            if lat and lon:
+                try:
+                    lat_f = float(lat)
+                    lon_f = float(lon)
+                except ValueError:
+                    lat_f = None
+                    lon_f = None
 
-        if lat and lon:
-            try:
-                lat_f = float(lat)
-                lon_f = float(lon)
-            except ValueError:
-                lat_f = None
-                lon_f = None
-
-            if lat_f is not None and lon_f is not None:
-                # ongeza distance kwa kila product na upange kwa ukaribu
-                items = add_distance_to_queryset(items, lat_f, lon_f)
-                items = sort_by_distance(items)
+                if lat_f is not None and lon_f is not None:
+                    # ongeza distance kwa kila product kwa Google na upange kwa ukaribu
+                    items = add_distance_to_queryset(base_qs, lat_f, lon_f)
+                    items = sort_by_distance(items)
+                else:
+                    items = list(base_qs)
+            else:
+                items = list(base_qs)
+        except GoogleMapsDistanceError as exc:
+            return Response(
+                {"error": f"Google Maps error: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         serializer = self.get_serializer(
             items,
@@ -643,9 +660,15 @@ class ProductViewSet(viewsets.ModelViewSet):
         # tumia filters za kawaida (search, category, price, n.k.)
         base_qs = self.filter_queryset(self.get_queryset())
 
-        # ongeza distance kwa kila product, panga kwa ukaribu
-        products = add_distance_to_queryset(base_qs, lat_f, lon_f)
-        products = sort_by_distance(products)
+        try:
+            # ongeza distance kwa kila product, panga kwa ukaribu kwa Google
+            products = add_distance_to_queryset(base_qs, lat_f, lon_f)
+            products = sort_by_distance(products)
+        except GoogleMapsDistanceError as exc:
+            return Response(
+                {"error": f"Google Maps error: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # HATUFANYI pagination hapa – tunarudisha array yote
         serializer = self.get_serializer(
@@ -668,7 +691,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         {
             "latitude": ...,
             "longitude": ...,
-            "radius": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu
+            "radius": 10,         # hapa kwa sasa hatuitumii kufilisha backend,
+                                   # tunasort tu kwa distance.
             "category": "...",
             "min_price": ...,
             "max_price": ...,
@@ -696,8 +720,14 @@ class ProductViewSet(viewsets.ModelViewSet):
         if max_price:
             queryset = queryset.filter(price__lte=max_price)
 
-        # HATUTUMII filter_by_radius tena – tuna-add distance na kupanga tu
-        products = add_distance_to_queryset(queryset, lat, lon)
+        try:
+            # HATUTUMII filter_by_radius – tuna-add distance (Google) na kupanga tu
+            products = add_distance_to_queryset(queryset, lat, lon)
+        except GoogleMapsDistanceError as exc:
+            return Response(
+                {"error": f"Google Maps error: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         if sort_by_field == "distance":
             products = sort_by_distance(products)
@@ -1089,7 +1119,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         qs = self.queryset.filter(seller=seller_profile)
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = OrderSerializer(page, many=True, context={"request": request})
+            serializer = OrderSerializer(qs, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
         serializer = OrderSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
@@ -1314,6 +1344,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         return Response({"is_typing": is_typing})
 
+
 class MessageViewSet(viewsets.ModelViewSet):
     """
     Chat messages ndani ya conversation
@@ -1524,11 +1555,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
 
 # =========================
-#  DISTANCE UTILITY (NO MAPBOX)
+#  DISTANCE UTILITY (GOOGLE MAPS)
 # =========================
 
 @extend_schema(
-    summary="Calculate distance between two points using Haversine",
+    summary="Calculate distance between two points using Google Distance Matrix",
     request=DistanceRequestSerializer,
     responses={
         200: DistanceResponseSerializer,
@@ -1540,7 +1571,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
 @permission_classes([AllowAny])
 def calculate_distance(request):
     """
-    Calculate distance between two points (km + miles) using Haversine formula
+    Calculate distance between two points (km + miles) using **Google Maps**.
+
+    - Inatumia Distance Matrix API (mode=driving, units=metric).
+    - Input: latitude1, longitude1, latitude2, longitude2.
     """
     lat1 = request.data.get("latitude1")
     lon1 = request.data.get("longitude1")
@@ -1565,6 +1599,11 @@ def calculate_distance(request):
                 "distance_km": float(distance),
                 "distance_miles": float(distance * Decimal("0.621371")),
             }
+        )
+    except GoogleMapsDistanceError as exc:
+        return Response(
+            {"error": f"Google Maps error: {exc}"},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -937,9 +937,12 @@ paths:
   /api/location/distance/:
     post:
       operationId: location_distance_create
-      description: Calculate distance between two points (km + miles) using Haversine
-        formula
-      summary: Calculate distance between two points using Haversine
+      description: |-
+        Calculate distance between two points (km + miles) using **Google Maps**.
+
+        - Inatumia Distance Matrix API (mode=driving, units=metric).
+        - Input: latitude1, longitude1, latitude2, longitude2.
+      summary: Calculate distance between two points using Google Distance Matrix
       tags:
       - location
       requestBody:
@@ -1952,8 +1955,9 @@ paths:
         /api/products/
 
         - Inatumia filters za kawaida (search, category, price, location ya mji).
-        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,
-          inapanga kwa distance ASC bila ku-cut off kwa radius.
+        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product
+          kwa kutumia Google Distance Matrix, inapanga kwa distance ASC
+          bila ku-cut off kwa radius.
         - Inarudisha ARRAY tu, hakuna pagination ya backend.
       parameters:
       - name: ordering
@@ -1994,8 +1998,9 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
-          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
+          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
+          kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2031,8 +2036,9 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
-          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
+          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
+          kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2063,8 +2069,9 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
-          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
+          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
+          kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2106,8 +2113,9 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
-          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
+          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
+          kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2148,8 +2156,9 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
-          kwa ukaribu (distance asc) bila kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
+          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
+          kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2222,7 +2231,8 @@ paths:
         {
             "latitude": ...,
             "longitude": ...,
-            "radius": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu
+            "radius": 10,         # hapa kwa sasa hatuitumii kufilisha backend,
+                                   # tunasort tu kwa distance.
             "category": "...",
             "min_price": ...,
             "max_price": ...,
@@ -2659,7 +2669,7 @@ paths:
     get:
       operationId: sellers_nearby_retrieve
       description: |-
-        Get nearby sellers based on user's location (Haversine)
+        Get nearby sellers based on user's location (Google Distance Matrix)
 
         - Hakuna tena LIMIT ya idadi ya maduka.
         - Kama `radius` imepelekwa → tunatumia filter_by_radius (km).

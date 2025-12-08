@@ -1529,8 +1529,8 @@
         "/api/location/distance/": {
             "post": {
                 "operationId": "location_distance_create",
-                "description": "Calculate distance between two points (km + miles) using Haversine formula",
-                "summary": "Calculate distance between two points using Haversine",
+                "description": "Calculate distance between two points (km + miles) using **Google Maps**.\n\n- Inatumia Distance Matrix API (mode=driving, units=metric).\n- Input: latitude1, longitude1, latitude2, longitude2.",
+                "summary": "Calculate distance between two points using Google Distance Matrix",
                 "tags": [
                     "location"
                 ],
@@ -3228,7 +3228,7 @@
         "/api/products/": {
             "get": {
                 "operationId": "products_list",
-                "description": "/api/products/\n\n- Inatumia filters za kawaida (search, category, price, location ya mji).\n- Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,\n  inapanga kwa distance ASC bila ku-cut off kwa radius.\n- Inarudisha ARRAY tu, hakuna pagination ya backend.",
+                "description": "/api/products/\n\n- Inatumia filters za kawaida (search, category, price, location ya mji).\n- Kama lat & lng zimetumwa → ina-add distance_km kwa kila product\n  kwa kutumia Google Distance Matrix, inapanga kwa distance ASC\n  bila ku-cut off kwa radius.\n- Inarudisha ARRAY tu, hakuna pagination ya backend.",
                 "parameters": [
                     {
                         "name": "ordering",
@@ -3285,7 +3285,7 @@
             },
             "post": {
                 "operationId": "products_create",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "tags": [
                     "products"
                 ],
@@ -3334,7 +3334,7 @@
         "/api/products/{id}/": {
             "get": {
                 "operationId": "products_retrieve",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3373,7 +3373,7 @@
             },
             "put": {
                 "operationId": "products_update",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3431,7 +3431,7 @@
             },
             "patch": {
                 "operationId": "products_partial_update",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3488,7 +3488,7 @@
             },
             "delete": {
                 "operationId": "products_destroy",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3580,7 +3580,7 @@
         "/api/products/search_nearby/": {
             "post": {
                 "operationId": "products_search_nearby_create",
-                "description": "Advanced nearby search via POST body (still guest-friendly)\n\nBody (NearbySearchSerializer):\n{\n    \"latitude\": ...,\n    \"longitude\": ...,\n    \"radius\": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu\n    \"category\": \"...\",\n    \"min_price\": ...,\n    \"max_price\": ...,\n    \"sort_by\": \"distance\" | \"price\" | \"rating\"\n}",
+                "description": "Advanced nearby search via POST body (still guest-friendly)\n\nBody (NearbySearchSerializer):\n{\n    \"latitude\": ...,\n    \"longitude\": ...,\n    \"radius\": 10,         # hapa kwa sasa hatuitumii kufilisha backend,\n                           # tunasort tu kwa distance.\n    \"category\": \"...\",\n    \"min_price\": ...,\n    \"max_price\": ...,\n    \"sort_by\": \"distance\" | \"price\" | \"rating\"\n}",
                 "tags": [
                     "products"
                 ],
@@ -4318,7 +4318,7 @@
         "/api/sellers/nearby/": {
             "get": {
                 "operationId": "sellers_nearby_retrieve",
-                "description": "Get nearby sellers based on user's location (Haversine)\n\n- Hakuna tena LIMIT ya idadi ya maduka.\n- Kama `radius` imepelekwa → tunatumia filter_by_radius (km).\n- Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.\n- Pagination hatutumii hapa, tunarudisha list yote kwa frontend.",
+                "description": "Get nearby sellers based on user's location (Google Distance Matrix)\n\n- Hakuna tena LIMIT ya idadi ya maduka.\n- Kama `radius` imepelekwa → tunatumia filter_by_radius (km).\n- Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.\n- Pagination hatutumii hapa, tunarudisha list yote kwa frontend.",
                 "tags": [
                     "sellers"
                 ],
