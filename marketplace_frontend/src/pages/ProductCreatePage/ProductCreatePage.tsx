@@ -1,20 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import apiClient from "../lib/apiClient";
-import { useAuth } from "../contexts/AuthContext";
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
+import apiClient from "../../lib/apiClient";
+import { useAuth } from "../../contexts/AuthContext";
+import MainHeader from "../../components/MainHeader";
+import MainFooter from "../../components/MainFooter";
 
 interface Category {
   id: number;
   name: string;
-}
-
-interface PaginatedCategoryList {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Category[];
+  description?: string;
 }
 
 interface ProductCreateForm {
@@ -27,25 +21,21 @@ interface ProductCreateForm {
   is_active: boolean;
 }
 
-interface ProductCreateResponse {
-  id: number;
-  image_url?: string | null;
-}
-
-interface ProductImageResponse {
-  id: number;
-  product: number;
-  image: string;
-  image_url?: string | null;
-}
-
 const ProductCreatePage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // ===== CATEGORIES (ZA DUKA LANGU) =====
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
+  // Quick-add category
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryDescription, setNewCategoryDescription] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  // ===== PRODUCT FORM =====
   const [form, setForm] = useState<ProductCreateForm>({
     category_id: "",
     name: "",
@@ -60,27 +50,34 @@ const ProductCreatePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // ===== IMAGE =====
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
 
+  // ==========================
+  //  LOAD CATEGORIES ZA DUKA LANGU
+  // ==========================
   useEffect(() => {
     const loadCategories = async () => {
       setLoadingCategories(true);
+      setCategoryError(null);
+
       try {
-        const res = await apiClient.get<PaginatedCategoryList>(
-          "/api/categories/"
-        );
-        setCategories(res.data.results || []);
+        // Tunatumia endpoint ya backend tuliyoijenga: /api/categories/mine/
+        const res = await apiClient.get<Category[]>("/api/categories/mine/");
+        setCategories(res.data || []);
       } catch (err) {
         console.error("Failed to load categories", err);
+        setCategoryError("Imeshindikana kupakia categories za duka. Unaweza kujaribu tena baadaye.");
       } finally {
         setLoadingCategories(false);
       }
     };
 
-    void loadCategories();
-  }, []);
+    if (user) {
+      void loadCategories();
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -95,6 +92,10 @@ const ProductCreatePage: React.FC = () => {
       </div>
     );
   }
+
+  // ==========================
+  //  HANDLERS
+  // ==========================
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -155,47 +156,63 @@ const ProductCreatePage: React.FC = () => {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  /**
-   * Upload product image kupitia /api/product-images/
-   * NOTE: hatuweki manually "Content-Type" ili browser / axios aweke boundary sahihi.
-   */
-  const uploadProductImage = async (
-    productId: number,
-    file: File
-  ): Promise<string | null> => {
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append("product", String(productId));
-      formData.append("image", file);
+  // ==========================
+  //  QUICK-ADD CATEGORY
+  // ==========================
 
-      const res = await apiClient.post<ProductImageResponse>(
-        "/api/product-images/",
-        formData
+  const handleCreateCategory = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setCategoryError(null);
+    setSuccess(null);
+
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) {
+      setCategoryError("Weka jina la category kwanza.");
+      return;
+    }
+
+    setCreatingCategory(true);
+    try {
+      const payload = {
+        name: trimmedName,
+        description: newCategoryDescription.trim(),
+      };
+
+      const res = await apiClient.post<Category>("/api/categories/", payload);
+      const newCat = res.data;
+
+      // ongeza kwenye list na upange kwa alfabeti kidogo
+      setCategories((prev) =>
+        [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name))
       );
 
-      const imageUrl = res.data.image_url ?? res.data.image;
-      if (!imageUrl) {
-        return null;
-      }
+      // ichague moja kwa moja kwenye product form
+      setForm((prev) => ({
+        ...prev,
+        category_id: String(newCat.id),
+      }));
 
-      // tusasisha product ili image_url ya product iwe sawa na gallery
-      try {
-        await apiClient.patch(`/api/products/${productId}/`, {
-          image_url: imageUrl,
-        });
-      } catch (patchErr) {
-        console.warn("Image uploaded but failed to patch image_url", patchErr);
-      }
+      setNewCategoryName("");
+      setNewCategoryDescription("");
+      setSuccess("Category imeongezwa na imechaguliwa. Sasa jaza taarifa za bidhaa.");
+    } catch (err: unknown) {
+      console.error("Failed to create category", err);
+      const axiosErr = err as { response?: { data?: unknown } };
+      const data = axiosErr.response?.data;
 
-      return imageUrl;
-    } catch (err) {
-      console.error("Failed to upload product image", err);
-      throw err;
+      if (data && typeof data === "object") {
+        setCategoryError("Imeshindikana kuhifadhi category: " + JSON.stringify(data));
+      } else {
+        setCategoryError("Imeshindikana kuhifadhi category. Jaribu tena.");
+      }
     } finally {
-      setUploadingImage(false);
+      setCreatingCategory(false);
     }
   };
+
+  // ==========================
+  //  SUBMIT PRODUCT (NA IMAGE)
+  // ==========================
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -204,41 +221,27 @@ const ProductCreatePage: React.FC = () => {
     setSuccess(null);
 
     try {
-      const payload = {
-        name: form.name,
-        description: form.description,
-        price: form.price,
-        currency: form.currency,
-        stock_quantity: form.stock_quantity,
-        is_active: form.is_active,
-        ...(form.category_id
-          ? { category_id: parseInt(form.category_id, 10) }
-          : {}),
-      };
+      // Tunatumia FormData ili tuweze kutuma image pamoja na fields zingine
+      const formData = new FormData();
+      formData.append("name", form.name);
+      formData.append("description", form.description);
+      formData.append("price", form.price);
+      formData.append("currency", form.currency);
+      formData.append("stock_quantity", String(form.stock_quantity));
+      formData.append("is_active", form.is_active ? "true" : "false");
 
-      // 1) Create product
-      const productRes = await apiClient.post<ProductCreateResponse>(
-        "/api/products/",
-        payload
-      );
-      const productId = productRes.data.id;
-
-      // 2) kama kuna picha, upload kupitia /api/product-images/
-      if (imageFile) {
-        try {
-          const newUrl = await uploadProductImage(productId, imageFile);
-          if (newUrl) {
-            setImagePreview(newUrl);
-          }
-        } catch (uploadErr) {
-          console.error(uploadErr);
-          setError(
-            "Product created, but failed to upload image. You can edit and try again."
-          );
-        }
+      if (form.category_id) {
+        formData.append("category_id", form.category_id);
       }
 
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
+      await apiClient.post("/api/products/", formData);
       setSuccess("Product created successfully.");
+
+      // kidogo tuu waweze kuona success, kisha turudi kwenye products
       setTimeout(() => navigate("/products"), 700);
     } catch (err: unknown) {
       console.error(err);
@@ -246,7 +249,7 @@ const ProductCreatePage: React.FC = () => {
       const data = axiosErr.response?.data;
 
       if (data && typeof data === "object") {
-        setError(JSON.stringify(data));
+        setError("Failed to create product: " + JSON.stringify(data));
       } else {
         setError("Failed to create product.");
       }
@@ -255,6 +258,9 @@ const ProductCreatePage: React.FC = () => {
     }
   };
 
+  // ==========================
+  //  UI
+  // ==========================
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors">
@@ -262,9 +268,14 @@ const ProductCreatePage: React.FC = () => {
 
       <main className="flex-1 max-w-3xl mx-auto py-8 px-4">
         <div className="mb-4 flex items-center justify-between gap-2">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-            Add new product
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+              Add new product
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Weka category (hiari) ili kupanga bidhaa zako, kisha jaza taarifa za bidhaa.
+            </p>
+          </div>
           <Link
             to="/seller-profile"
             className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline"
@@ -273,6 +284,7 @@ const ProductCreatePage: React.FC = () => {
           </Link>
         </div>
 
+        {/* GLOBAL ERROR / SUCCESS */}
         {error && (
           <div className="mb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/40 p-2 rounded-lg">
             {error}
@@ -284,11 +296,76 @@ const ProductCreatePage: React.FC = () => {
           </div>
         )}
 
+        {/* QUICK ADD CATEGORY (JUU KABLA YA PRODUCT FORM) */}
+        <form
+          onSubmit={handleCreateCategory}
+          className="mb-5 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-5 space-y-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Shop categories
+            </h3>
+            {loadingCategories && (
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                Loading...
+              </span>
+            )}
+          </div>
+
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            Tengeneza categories kama <span className="font-medium">Simu</span>,{" "}
+            <span className="font-medium">Laptop</span>,{" "}
+            <span className="font-medium">Accessories</span> ili kupanga bidhaa zako
+            ndani ya duka. Si lazima kutumia categories.
+          </p>
+
+          {categoryError && (
+            <div className="text-[11px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/40 p-2 rounded-lg">
+              {categoryError}
+            </div>
+          )}
+
+          <div className="flex flex-col md:flex-row md:items-end gap-3">
+            <div className="flex-1 space-y-1">
+              <label className="block text-xs text-slate-700 dark:text-slate-200">
+                New category name
+              </label>
+              <input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder="e.g. Phones"
+              />
+            </div>
+            <div className="flex-1 space-y-1">
+              <label className="block text-xs text-slate-700 dark:text-slate-200">
+                Description (optional)
+              </label>
+              <input
+                value={newCategoryDescription}
+                onChange={(e) => setNewCategoryDescription(e.target.value)}
+                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder="e.g. Smartphones and feature phones"
+              />
+            </div>
+            <div className="pt-1 md:pt-0">
+              <button
+                type="submit"
+                disabled={creatingCategory}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold hover:bg-black disabled:opacity-60"
+              >
+                {creatingCategory ? "Saving..." : "Save category"}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {/* PRODUCT FORM */}
         <form
           onSubmit={handleSubmit}
           className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 md:p-6 space-y-4"
         >
-          {/* Category */}
+          {/* Category select */}
           <div className="space-y-1">
             <label className="block text-xs text-slate-700 dark:text-slate-200">
               Category{" "}
@@ -303,13 +380,16 @@ const ProductCreatePage: React.FC = () => {
               className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               disabled={loadingCategories}
             >
-              <option value="">-- Select category --</option>
+              <option value="">-- No category / Select category --</option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
               ))}
             </select>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+              Si lazima uwe na categories; unaweza kuacha tupu kama hutaki.
+            </p>
           </div>
 
           {/* Name */}
@@ -430,11 +510,6 @@ const ProductCreatePage: React.FC = () => {
                   {imageFile.name}
                 </span>
               )}
-              {uploadingImage && (
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Uploading...
-                </span>
-              )}
             </div>
 
             {imagePreview && (
@@ -454,7 +529,7 @@ const ProductCreatePage: React.FC = () => {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={saving || uploadingImage}
+              disabled={saving}
               className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
             >
               {saving ? "Saving..." : "Create product"}

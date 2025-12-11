@@ -216,7 +216,7 @@ const productsPageTexts: Record<"en" | "sw", ProductsPageTexts> = {
     geoPositionUnavailable:
       "Eneo lako halijapatikana kwa sasa. Jaribu tena ukiwa kwenye eneo lenye mtandao au GPS bora.",
     geoTimeout:
-      "Imeshachukua muda mrefu kutafuta eneo lako. Jaribu tena au andika eneo lako kwenye kisanduku.",
+      "Imeshachukua muda mrefu kutafuta eneo lako. Jaribu tena au washa location.",
 
     searchButton: "Tafuta",
 

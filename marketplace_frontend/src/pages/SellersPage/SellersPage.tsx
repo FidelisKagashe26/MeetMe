@@ -1,9 +1,11 @@
 // src/pages/SellersPage.tsx
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import apiClient from "../lib/apiClient";
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
+import apiClient from "../../lib/apiClient";
+import MainHeader from "../../components/MainHeader";
+import MainFooter from "../../components/MainFooter";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getSellersPageTexts } from "./sellersPageTexts";
 
 interface SellerLocation {
   address?: string | null;
@@ -52,7 +54,18 @@ const getSellerInitial = (seller: SellerProfile): string => {
   return seller.business_name?.charAt(0)?.toUpperCase() || "";
 };
 
+// ====== ERROR MESSAGE CONSTANTS (SW original) ======
+const ERROR_LOAD_SELLERS =
+  "Imeshindikana kupakia maduka. Jaribu tena baadae.";
+const ERROR_NO_GPS_SUPPORT =
+  "Kifaa chako hakina msaada wa GPS (geolocation).";
+const ERROR_GEOLOCATION_FAILED =
+  "Imeshindikana kupata location yako. Ruhusu browser kutumia location kisha jaribu tena.";
+
 const SellersPage: React.FC = () => {
+  const { language } = useLanguage();
+  const texts = getSellersPageTexts(language);
+
   const [sellers, setSellers] = useState<SellerProfile[]>([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
 
@@ -129,7 +142,7 @@ const SellersPage: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      setError("Imeshindikana kupakia maduka. Jaribu tena baadae.");
+      setError(ERROR_LOAD_SELLERS);
     } finally {
       setLoading(false);
     }
@@ -160,7 +173,7 @@ const SellersPage: React.FC = () => {
 
   const handleNearMe = () => {
     if (!navigator.geolocation) {
-      setError("Kifaa chako hakina msaada wa GPS (geolocation).");
+      setError(ERROR_NO_GPS_SUPPORT);
       return;
     }
 
@@ -186,9 +199,7 @@ const SellersPage: React.FC = () => {
       (geoError) => {
         console.error(geoError);
         setLocating(false);
-        setError(
-          "Imeshindikana kupata location yako. Ruhusu browser kutumia location kisha jaribu tena.",
-        );
+        setError(ERROR_GEOLOCATION_FAILED);
       },
       {
         enableHighAccuracy: true,
@@ -310,6 +321,20 @@ const SellersPage: React.FC = () => {
     return `https://www.google.com/maps?q=${latNum},${lngNum}&z=14&output=embed`;
   };
 
+  const getErrorText = () => {
+    if (!error) return null;
+    switch (error) {
+      case ERROR_LOAD_SELLERS:
+        return texts.errorLoadSellers;
+      case ERROR_NO_GPS_SUPPORT:
+        return texts.errorNoGpsSupport;
+      case ERROR_GEOLOCATION_FAILED:
+        return texts.errorGeolocationFailed;
+      default:
+        return error;
+    }
+  };
+
   // reusable card kwa "all/search" mode
   const renderSellerGridCard = (seller: SellerProfile) => {
     const distanceLabel = formatDistance(seller.distance);
@@ -335,7 +360,7 @@ const SellersPage: React.FC = () => {
             />
           ) : (
             <div className="w-full h-32 bg-linear-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center text-[11px] text-slate-500 dark:text-slate-300">
-              Hakuna picha ya duka / No shop photo
+              {texts.coverNoPhoto}
             </div>
           )}
 
@@ -363,7 +388,7 @@ const SellersPage: React.FC = () => {
             {seller.is_verified && (
               <span className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Verified
+                {texts.verifiedBadge}
               </span>
             )}
           </div>
@@ -388,7 +413,7 @@ const SellersPage: React.FC = () => {
               {Number.isFinite(seller.rating)
                 ? seller.rating.toFixed(1)
                 : seller.rating}{" "}
-              • {seller.total_sales} sales
+              • {seller.total_sales} {texts.salesLabel}
               {distanceLabel && mode === "nearby" && <> • {distanceLabel}</>}
             </span>
             {seller.phone_number && (
@@ -396,14 +421,14 @@ const SellersPage: React.FC = () => {
             )}
           </div>
 
-          {/* CTA: Visit + Start route (Sw + Eng) - zikae chini */}
+          {/* CTA: Visit + Start route - zikae chini */}
           <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px]">
             <div className="flex flex-col">
               <span className="font-medium text-slate-800 dark:text-slate-100">
-                Tembelea duka · Visit shop
+                {texts.cardVisitShopTitle}
               </span>
               <span className="text-slate-400 dark:text-slate-500">
-                Bofya card kufungua ukurasa wa duka / Click to open shop page
+                {texts.cardVisitShopSubtitle}
               </span>
             </div>
 
@@ -415,7 +440,7 @@ const SellersPage: React.FC = () => {
                 onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center justify-center px-2.5 py-1 rounded-full border border-orange-500 text-orange-600 dark:text-orange-300 text-[11px] hover:bg-orange-50 dark:hover:bg-orange-500/10"
               >
-                Anza safari / Start route
+                {texts.cardStartRoute}
               </a>
             ) : mapUrl ? (
               <a
@@ -425,11 +450,11 @@ const SellersPage: React.FC = () => {
                 onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center justify-center px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-200 text-[11px] hover:border-orange-500 hover:text-orange-600"
               >
-                Ramani / Map
+                {texts.cardMap}
               </a>
             ) : (
               <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                Hakuna coordinates
+                {texts.cardNoCoordinates}
               </span>
             )}
           </div>
@@ -484,7 +509,7 @@ const SellersPage: React.FC = () => {
                               />
                             ) : (
                               <div className="w-full h-28 bg-linear-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center text-[11px] text-slate-500 dark:text-slate-300">
-                                Hakuna picha ya duka / No shop photo
+                                {texts.coverNoPhoto}
                               </div>
                             )}
                             <div className="absolute left-4 bottom-[-18px]">
@@ -510,7 +535,7 @@ const SellersPage: React.FC = () => {
                               {seller.is_verified && (
                                 <span className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  Verified
+                                  {texts.verifiedBadge}
                                 </span>
                               )}
                             </div>
@@ -531,7 +556,7 @@ const SellersPage: React.FC = () => {
                                 {Number.isFinite(seller.rating)
                                   ? seller.rating.toFixed(1)
                                   : seller.rating}{" "}
-                                • {seller.total_sales} sales
+                                • {seller.total_sales} {texts.salesLabel}
                                 {distanceLabel && <> • {distanceLabel}</>}
                               </span>
                               {seller.phone_number && (
@@ -549,7 +574,7 @@ const SellersPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Quick actions: simu, directions, bidhaa (Sw + Eng) - all bottom */}
+                        {/* Quick actions: simu, directions, bidhaa - all bottom */}
                         <div className="mt-auto px-4 pt-2 pb-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2 text-[11px]">
                           {seller.phone_number && (
                             <a
@@ -557,7 +582,7 @@ const SellersPage: React.FC = () => {
                               onClick={(e) => e.stopPropagation()}
                               className="inline-flex items-center justify-center px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-orange-500 hover:text-orange-600"
                             >
-                              Piga simu / Call
+                              {texts.nearbyCallButton}
                             </a>
                           )}
                           {directionsUrl && (
@@ -568,7 +593,7 @@ const SellersPage: React.FC = () => {
                               onClick={(e) => e.stopPropagation()}
                               className="inline-flex items-center justify-center px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-orange-500 hover:text-orange-600"
                             >
-                              Anza safari / Start route
+                              {texts.nearbyStartRouteButton}
                             </a>
                           )}
                           <Link
@@ -576,7 +601,7 @@ const SellersPage: React.FC = () => {
                             onClick={(e) => e.stopPropagation()}
                             className="inline-flex items-center justify-center px-2.5 py-1 rounded-full bg-orange-500 text-white hover:bg-orange-600"
                           >
-                            Bidhaa / Products
+                            {texts.nearbyProductsButton}
                           </Link>
                         </div>
                       </div>
@@ -590,16 +615,15 @@ const SellersPage: React.FC = () => {
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <div>
                     <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                      Ramani ya maduka karibu na wewe
+                      {texts.nearbyMapPanelTitle}
                     </h2>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Bofya duka upande wa kushoto kuona pointer yake kwenye
-                      ramani.
+                      {texts.nearbyMapPanelDescription}
                     </p>
                   </div>
                   {selectedSellerId && (
                     <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                      Duka lililochaguliwa:{" "}
+                      {texts.nearbySelectedShopLabel}{" "}
                       <span className="font-medium">
                         {
                           sellers.find((s) => s.id === selectedSellerId)
@@ -619,9 +643,7 @@ const SellersPage: React.FC = () => {
                   />
                 ) : (
                   <div className="h-full flex items-center justify-center text-sm text-slate-500 dark:text-slate-400 px-4 text-center">
-                    Hakuna coordinates kamili za ramani kwa duka
-                    lililochaguliwa. Hakikisha maduka yana latitude/longitude
-                    kwenye backend.
+                    {texts.nearbyMapPanelNoCoords}
                   </div>
                 )}
               </div>
@@ -639,21 +661,21 @@ const SellersPage: React.FC = () => {
           {/* Title + Filters */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Sellers kwenye LINKA
+              <h1 className="text-lg font-semibold text-slate-9
+00 dark:text-white">
+                {texts.pageTitle}
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Tafuta wauzaji kwa jina, mji, nchi au tumia{" "}
-                <span className="font-semibold text-orange-600">near me</span>{" "}
-                kuona maduka yaliyo karibu na ulipo.
+                {texts.pageSubtitle}
               </p>
               {typeof totalCount === "number" && (
                 <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-                  Jumla ya maduka:{" "}
+                  {texts.totalShopsLabel}{" "}
                   <span className="font-medium text-slate-600 dark:text-slate-300">
                     {totalCount}
                   </span>
-                  {mode === "nearby" && " (karibu na wewe)"}
+                  {mode === "nearby" &&
+                    ` ${texts.totalShopsNearbySuffix}`}
                 </p>
               )}
             </div>
@@ -667,11 +689,11 @@ const SellersPage: React.FC = () => {
                     : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300"
                 }`}
               >
-                Orodha yote
+                {texts.modeAllBadge}
               </span>
               {mode === "nearby" && (
                 <span className="px-2.5 py-1 rounded-full border border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10">
-                  Near me: {radiusKm} km
+                  {texts.nearbyModeBadge(radiusKm)}
                 </span>
               )}
             </div>
@@ -686,7 +708,7 @@ const SellersPage: React.FC = () => {
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Tafuta seller kwa jina, mji, nchi..."
+                  placeholder={texts.searchPlaceholder}
                   className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white pr-8"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -697,7 +719,7 @@ const SellersPage: React.FC = () => {
                     onClick={handleClearSearch}
                     className="absolute inset-y-0 right-2 my-auto text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   >
-                    Futa
+                    {texts.clearSearchButton}
                   </button>
                 )}
               </div>
@@ -705,7 +727,7 @@ const SellersPage: React.FC = () => {
                 type="submit"
                 className="px-4 py-2 rounded-full bg-orange-500 text-white text-xs font-medium hover:bg-orange-600"
               >
-                Tafuta
+                {texts.searchButton}
               </button>
             </form>
 
@@ -718,12 +740,14 @@ const SellersPage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] text-slate-700 dark:text-slate-200 hover:border-orange-500 hover:text-orange-600 disabled:opacity-60"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {locating ? "Inatafuta location yako..." : "Sellers near me"}
+                  {locating
+                    ? texts.nearMeButtonLocating
+                    : texts.nearMeButtonIdle}
                 </button>
 
                 {mode === "nearby" && (
                   <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    <span>Radius:</span>
+                    <span>{texts.nearMeRadiusLabel}</span>
                     <input
                       type="number"
                       min={1}
@@ -739,7 +763,7 @@ const SellersPage: React.FC = () => {
 
               {coords && (
                 <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                  Location yako imekadiriwa:{" "}
+                  {texts.coordsEstimatedLabel}{" "}
                   <span className="font-mono">
                     {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
                   </span>
@@ -749,20 +773,20 @@ const SellersPage: React.FC = () => {
           </div>
 
           {/* Feedback messages */}
-          {error && (
+          {getErrorText() && (
             <div className="mb-4 text-xs text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-600/40 rounded-xl px-3 py-2">
-              {error}
+              {getErrorText()}
             </div>
           )}
 
           {/* List / loading states */}
           {loading ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              Inapakia maduka...
+              {texts.loadingText}
             </div>
           ) : sellers.length === 0 ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              Hakuna seller aliyeonekana kwa vigezo ulivyoweka.
+              {texts.emptyStateText}
             </div>
           ) : mode === "nearby" && nearbyLayout ? (
             nearbyLayout

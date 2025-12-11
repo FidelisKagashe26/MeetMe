@@ -1,4 +1,3 @@
-# api/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (
@@ -58,7 +57,7 @@ urlpatterns = [
     path("auth/jwt/verify/", TokenVerifyView.as_view(), name="jwt-verify"),
 
     # ======================
-    #  LOCATION / DISTANCE UTILITY (GOOGLE)
+    #  LOCATION / DISTANCE UTILITY
     # ======================
     path("location/distance/", views.calculate_distance, name="calculate-distance"),
 

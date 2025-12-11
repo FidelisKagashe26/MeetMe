@@ -1,18 +1,19 @@
-// src/pages/SellerProfilePage.tsx
-
+// src/pages/seller/SellerProfilePage.tsx
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import apiClient from "../lib/apiClient";
-import { useAuth } from "../contexts/AuthContext";
-import { useLanguage } from "../contexts/LanguageContext";
-import GoogleMapPreview, { type LatLng } from "../components/GoogleMapPreview";
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
+import apiClient from "../../lib/apiClient";
+import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import GoogleMapPreview, { type LatLng } from "../../components/GoogleMapPreview";
+import MainHeader from "../../components/MainHeader";
+import MainFooter from "../../components/MainFooter";
 
 // Phone input ya mataifa yote
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
+
+import { sellerProfileTexts } from "./sellerProfileTexts";
 
 // -------------------- TYPES --------------------
 
@@ -122,6 +123,9 @@ const SellerProfilePage: React.FC = () => {
   const { language } = useLanguage();
   const isSw = language === "sw";
 
+  const tx = (key: keyof typeof sellerProfileTexts) =>
+    isSw ? sellerProfileTexts[key].sw : sellerProfileTexts[key].en;
+
   // -------- FORM STATE --------
   const [form, setForm] = useState<SellerProfilePayload>({
     business_name: "",
@@ -170,11 +174,14 @@ const SellerProfilePage: React.FC = () => {
     products: false,
   });
 
-  const steps: { id: SellerStep; labelEn: string; labelSw: string }[] = [
-    { id: "profile", labelEn: "Profile", labelSw: "Wasifu" },
-    { id: "location", labelEn: "Location", labelSw: "Location" },
-    { id: "products", labelEn: "Products", labelSw: "Bidhaa" },
-  ];
+  const steps: { id: SellerStep; labelKey: keyof typeof sellerProfileTexts }[] =
+    [
+      { id: "profile", labelKey: "stepProfileLabel" },
+      { id: "location", labelKey: "stepLocationLabel" },
+      { id: "products", labelKey: "stepProductsLabel" },
+    ];
+
+  const activeIndex = steps.findIndex((s) => s.id === activeStep);
 
   // -------- HANDLERS --------
 
@@ -204,9 +211,7 @@ const SellerProfilePage: React.FC = () => {
     if (!file) {
       setLogoFile(null);
       // fallback: tumia kile kimetoka backend
-      setLogoPreview(
-        sellerSummary?.logo_url || sellerSummary?.logo || null,
-      );
+      setLogoPreview(sellerSummary?.logo_url || sellerSummary?.logo || null);
       return;
     }
     setLogoFile(file);
@@ -221,9 +226,7 @@ const SellerProfilePage: React.FC = () => {
     if (!file) {
       setShopImageFile(null);
       setShopImagePreview(
-        sellerSummary?.shop_image_url ||
-          sellerSummary?.shop_image ||
-          null,
+        sellerSummary?.shop_image_url || sellerSummary?.shop_image || null,
       );
       return;
     }
@@ -232,39 +235,30 @@ const SellerProfilePage: React.FC = () => {
     setShopImagePreview(objectUrl);
   };
 
-  const loadMyProducts = async (sellerPk: number) => {
+  /**
+   * Products za muuzaji aliye login
+   * - Inatumia /api/products/mine/
+   * - Ina-handle response iwe ARRAY au paginated (results[])
+   */
+  const loadMyProducts = async () => {
     setLoadingProducts(true);
     setProductsError(null);
     try {
-      const params = new URLSearchParams();
-      params.set("seller_id", String(sellerPk));
-      params.set("page", "1");
-      params.set("page_size", "100");
-
-      const res = await apiClient.get<PaginatedProductList>(
-        `/api/products/?${params.toString()}`,
+      const res = await apiClient.get<PaginatedProductList | MyProduct[]>(
+        "/api/products/mine/",
       );
 
-      const all = res.data.results || [];
+      const raw = res.data;
+      const list: MyProduct[] = Array.isArray(raw) ? raw : raw.results || [];
 
-      // 🔐 MUHIMU: hakikisha muuzaji anaona BIDHAA ZAKE TU
-      const mineOnly = all.filter(
-        (p) =>
-          p.seller_id === sellerPk || (p.seller && p.seller.id === sellerPk),
-      );
-
-      setMyProducts(mineOnly);
+      setMyProducts(list);
       setCompleted((prev) => ({
         ...prev,
-        products: mineOnly.length > 0,
+        products: list.length > 0,
       }));
     } catch (err) {
       console.error(err);
-      setProductsError(
-        isSw
-          ? "Imeshindikana kupakia bidhaa zako."
-          : "Failed to load your products.",
-      );
+      setProductsError(tx("loadProductsError"));
     } finally {
       setLoadingProducts(false);
     }
@@ -312,7 +306,7 @@ const SellerProfilePage: React.FC = () => {
         location: !!mine.location,
       }));
 
-      void loadMyProducts(mine.id);
+      void loadMyProducts();
     } catch (err) {
       console.error(err);
 
@@ -326,11 +320,7 @@ const SellerProfilePage: React.FC = () => {
           products: false,
         });
       } else {
-        setError(
-          isSw
-            ? "Imeshindikana kupakia wasifu wa muuzaji."
-            : "Failed to load seller profile.",
-        );
+        setError(tx("loadProfileError"));
       }
     } finally {
       setLoading(false);
@@ -344,11 +334,7 @@ const SellerProfilePage: React.FC = () => {
 
   const handleUseMyLocation = () => {
     if (!navigator.geolocation) {
-      setError(
-        isSw
-          ? "Geolocation haipatikani kwenye browser hii."
-          : "Geolocation is not available in this browser.",
-      );
+      setError(tx("geolocationNotAvailable"));
       return;
     }
 
@@ -374,11 +360,7 @@ const SellerProfilePage: React.FC = () => {
       },
       (geoError) => {
         console.error(geoError);
-        setError(
-          isSw
-            ? "Imeshindikana kusoma location yako."
-            : "Failed to read your current location.",
-        );
+        setError(tx("geolocationReadError"));
         setGeoLoading(false);
       },
       {
@@ -415,11 +397,7 @@ const SellerProfilePage: React.FC = () => {
     // ---------- STEP 1: PROFILE ONLY (NO API) ----------
     if (activeStep === "profile") {
       if (!form.business_name.trim()) {
-        setError(
-          isSw
-            ? "Tafadhali weka jina la biashara kabla ya kuendelea."
-            : "Please enter your business name before continuing.",
-        );
+        setError(tx("profileStep1MissingNameError"));
         return;
       }
 
@@ -429,11 +407,7 @@ const SellerProfilePage: React.FC = () => {
       }));
 
       setActiveStep("location");
-      setSuccess(
-        isSw
-          ? "Hatua ya kwanza imekamilika. Sasa jaza taarifa za location ya duka."
-          : "Step 1 completed. Now fill your shop location details.",
-      );
+      setSuccess(tx("profileStep1CompletedMessage"));
       return;
     }
 
@@ -445,11 +419,7 @@ const SellerProfilePage: React.FC = () => {
     // ---------- STEP 2: LOCATION + PROFILE -> TUMA BACKEND ----------
     // Hakikisha bado tuna business_name (kama mtu ameruka moja kwa moja kwenda step 2)
     if (!form.business_name.trim()) {
-      setError(
-        isSw
-          ? "Tafadhali jaza kwanza jina la biashara kwenye hatua ya kwanza."
-          : "Please fill your business name in the first step before saving.",
-      );
+      setError(tx("profileStep2MissingNameError"));
       setActiveStep("profile");
       return;
     }
@@ -573,24 +543,16 @@ const SellerProfilePage: React.FC = () => {
 
       if (!sellerId) {
         // kama ilikuwa creation mpya, load bidhaa baada ya kuwa na sellerId
-        void loadMyProducts(finalSeller.id);
+        void loadMyProducts();
       }
 
-      const msg = isSw
-        ? "Wasifu wa muuzaji na location vimehifadhiwa kikamilifu."
-        : "Seller profile and location have been saved successfully.";
-
-      setSuccess(msg);
+      setSuccess(tx("saveProfileSuccess"));
 
       // Baada ya hatua ya pili, peleka user hatua ya tatu (optional products)
       setActiveStep("products");
     } catch (err) {
       console.error(err);
-      setError(
-        isSw
-          ? "Imeshindikana kuhifadhi taarifa za muuzaji."
-          : "Failed to save seller profile.",
-      );
+      setError(tx("saveProfileError"));
     } finally {
       setSaving(false);
     }
@@ -610,9 +572,7 @@ const SellerProfilePage: React.FC = () => {
         <MainHeader />
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 text-xs md:text-sm">
-            {isSw
-              ? "Lazima uingie (login) ili kudhibiti wasifu wa muuzaji."
-              : "You must be logged in to manage seller profile."}
+            {tx("mustLogin")}
           </div>
         </main>
         <MainFooter />
@@ -629,7 +589,7 @@ const SellerProfilePage: React.FC = () => {
         <div className="mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-semibold overflow-hidden">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-sm font-semibold overflow-hidden">
                 {logoPreview ? (
                   <img
                     src={logoPreview}
@@ -644,26 +604,19 @@ const SellerProfilePage: React.FC = () => {
             <div>
               <h2 className="text-base md:text-xl font-semibold text-slate-900 dark:text-slate-50">
                 {sellerId
-                  ? form.business_name ||
-                    (isSw ? "Dashibodi ya muuzaji" : "Seller dashboard")
-                  : isSw
-                  ? "Weka taarifa za duka lako"
-                  : "Set up your seller account"}
+                  ? form.business_name || tx("headerExistingTitle")
+                  : tx("headerNewTitle")}
               </h2>
               <p className="text-[11px] md:text-[12px] text-slate-500 dark:text-slate-400">
-                {isSw
-                  ? "Simamia taarifa za duka, location na bidhaa kutoka sehemu moja."
-                  : "Manage your shop details, location and products from one place."}
+                {tx("headerSubtitle")}
               </p>
               {sellerSummary && (
                 <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                   <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
-                    {isSw ? "Rating" : "Rating"}:{" "}
-                    {sellerSummary.rating || "N/A"}
+                    {tx("headerRatingLabel")}: {sellerSummary.rating || "N/A"}
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
-                    {isSw ? "Mauzo yote" : "Total sales"}:{" "}
-                    {sellerSummary.total_sales}
+                    {tx("headerTotalSalesLabel")}: {sellerSummary.total_sales}
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full ${
@@ -673,12 +626,8 @@ const SellerProfilePage: React.FC = () => {
                     }`}
                   >
                     {sellerSummary.is_verified
-                      ? isSw
-                        ? "Duka limesajiliwa (verified)"
-                        : "Verified shop"
-                      : isSw
-                      ? "Bado halijathibitishwa"
-                      : "Not verified"}
+                      ? tx("headerVerified")
+                      : tx("headerNotVerified")}
                   </span>
                 </div>
               )}
@@ -691,15 +640,13 @@ const SellerProfilePage: React.FC = () => {
                 to={`/shops/${sellerId}`}
                 className="px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-[11px] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
-                {isSw ? "Angalia ukurasa wa duka" : "View public shop page"}
+                {tx("viewPublicShopPage")}
               </Link>
             )}
 
             {/* logo upload quick action */}
             <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-100 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-              <span>
-                {isSw ? "Badili logo ya kampuni" : "Change company logo"}
-              </span>
+              <span>{tx("changeCompanyLogo")}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -712,7 +659,7 @@ const SellerProfilePage: React.FC = () => {
 
         {loading && (
           <div className="text-[11px] md:text-sm text-slate-600 dark:text-slate-300 mb-3">
-            {isSw ? "Inapakia taarifa..." : "Loading current profile..."}
+            {tx("loadingProfile")}
           </div>
         )}
 
@@ -730,40 +677,52 @@ const SellerProfilePage: React.FC = () => {
         {!loading && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-5 md:p-7 lg:p-8">
             {/* PROGRESS STEPS */}
-            <div className="flex items-center justify-between gap-3 mb-5 text-[11px] md:text-xs">
-              {steps.map((step, index) => {
-                const isActive = activeStep === step.id;
-                const isDone = stepStatus(step.id);
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => setActiveStep(step.id)}
-                    className="flex-1 flex flex-col items-center gap-1 group"
-                  >
-                    <div
-                      className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center border text-[11px] ${
-                        isActive
-                          ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                          : isDone
-                          ? "bg-emerald-500 text-white border-emerald-500"
-                          : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"
-                      }`}
+            <div className="mb-5">
+              <div className="flex items-center justify-between gap-2 mb-2 text-[11px] md:text-xs">
+                <span className="text-slate-500 dark:text-slate-400">
+                  {`${tx("stepCounterPrefix")} ${activeIndex + 1} ${tx(
+                    "stepCounterOf",
+                  )} ${steps.length}`}
+                </span>
+                <span className="hidden sm:inline text-slate-400 dark:text-slate-500">
+                  {tx("stepTapHint")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-[11px] md:text-xs">
+                {steps.map((step, index) => {
+                  const isActive = activeStep === step.id;
+                  const isDone = stepStatus(step.id);
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => setActiveStep(step.id)}
+                      className="flex-1 flex flex-col items-center gap-1 group"
                     >
-                      {isDone && !isActive ? "✓" : index + 1}
-                    </div>
-                    <span
-                      className={`${
-                        isActive
-                          ? "text-orange-600 dark:text-orange-400 font-medium"
-                          : "text-slate-500 dark:text-slate-400"
-                      }`}
-                    >
-                      {isSw ? step.labelSw : step.labelEn}
-                    </span>
-                  </button>
-                );
-              })}
+                      <div
+                        className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center border text-[11px] ${
+                          isActive
+                            ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                            : isDone
+                            ? "bg-emerald-500 text-white border-emerald-500"
+                            : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"
+                        }`}
+                      >
+                        {isDone && !isActive ? "✓" : index + 1}
+                      </div>
+                      <span
+                        className={`${
+                          isActive
+                            ? "text-orange-600 dark:text-orange-400 font-medium"
+                            : "text-slate-500 dark:text-slate-400"
+                        }`}
+                      >
+                        {tx(step.labelKey)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* FORM STEPS */}
@@ -778,25 +737,21 @@ const SellerProfilePage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-[1.2fr,1.2fr] gap-4">
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Jina la biashara" : "Business name"}
+                          {tx("profileBusinessNameLabel")}
                         </label>
                         <input
                           name="business_name"
                           value={form.business_name}
                           onChange={handleChange}
                           className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs md:text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                          placeholder={
-                            isSw
-                              ? "mf. Microspace Dodoma"
-                              : "e.g. Microspace Dodoma"
-                          }
+                          placeholder={tx("profileBusinessNamePlaceholder")}
                           required
                         />
                       </div>
 
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Namba ya simu" : "Phone number"}
+                          {tx("profilePhoneLabel")}
                         </label>
                         <div className="w-full">
                           <PhoneInput
@@ -821,16 +776,14 @@ const SellerProfilePage: React.FC = () => {
                           />
                         </div>
                         <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                          {isSw
-                            ? "Unaweza kuchagua namba ya nchi yoyote, lakini default ni Tanzania."
-                            : "You can choose any country's phone number, but the default is Tanzania."}
+                          {tx("profilePhoneHint")}
                         </p>
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                        {isSw ? "Maelezo mafupi ya duka" : "Description"}
+                        {tx("profileDescriptionLabel")}
                       </label>
                       <textarea
                         name="description"
@@ -838,11 +791,7 @@ const SellerProfilePage: React.FC = () => {
                         onChange={handleChange}
                         className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs md:text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                         rows={4}
-                        placeholder={
-                          isSw
-                            ? "Elezea kwa ufupi unachouza au huduma unazotoa."
-                            : "Short description about your store/services."
-                        }
+                        placeholder={tx("profileDescriptionPlaceholder")}
                       />
                     </div>
 
@@ -851,12 +800,10 @@ const SellerProfilePage: React.FC = () => {
                       {/* COMPANY LOGO FIELD */}
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw
-                            ? "Logo ya kampuni / brand"
-                            : "Company / brand logo"}
+                          {tx("logoLabel")}
                         </label>
                         <div className="flex items-center gap-3">
-                          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden text-[10px] text-slate-500 dark:text-slate-300">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden text-[10px] text-slate-500 dark:text-slate-300">
                             {logoPreview ? (
                               <img
                                 src={logoPreview}
@@ -864,13 +811,11 @@ const SellerProfilePage: React.FC = () => {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span>
-                                {isSw ? "Hakuna logo" : "No logo"}
-                              </span>
+                              <span>{tx("logoNone")}</span>
                             )}
                           </div>
                           <label className="text-[11px] px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                            {isSw ? "Chagua picha..." : "Choose image..."}
+                            {tx("logoChooseImageBtn")}
                             <input
                               type="file"
                               accept="image/*"
@@ -880,21 +825,17 @@ const SellerProfilePage: React.FC = () => {
                           </label>
                         </div>
                         <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                          {isSw
-                            ? "Logo itaonekana kama kitambulisho kidogo karibu na jina la duka kwenye sehemu mbalimbali."
-                            : "Logo will be used as a small avatar next to your shop name across the app."}
+                          {tx("logoHelpText")}
                         </p>
                       </div>
 
                       {/* SHOP FRONT IMAGE FIELD */}
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw
-                            ? "Picha ya nje ya duka (facade)"
-                            : "Shop front photo (facade)"}
+                          {tx("shopImageLabel")}
                         </label>
                         <div className="flex items-center gap-3">
-                          <div className="w-20 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden text-[10px] text-slate-500 dark:text-slate-300">
+                          <div className="w-full max-w-[220px] aspect-4/3 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden text-[10px] text-slate-500 dark:text-slate-300">
                             {shopImagePreview ? (
                               <img
                                 src={shopImagePreview}
@@ -902,17 +843,11 @@ const SellerProfilePage: React.FC = () => {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span>
-                                {isSw
-                                  ? "Hakuna picha ya duka"
-                                  : "No shop photo"}
-                              </span>
+                              <span>{tx("shopImageNone")}</span>
                             )}
                           </div>
                           <label className="text-[11px] px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                            {isSw
-                              ? "Weka picha ya duka..."
-                              : "Upload shop photo..."}
+                            {tx("shopImageUploadBtn")}
                             <input
                               type="file"
                               accept="image/*"
@@ -922,9 +857,7 @@ const SellerProfilePage: React.FC = () => {
                           </label>
                         </div>
                         <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                          {isSw
-                            ? "Picha hii itaonekana kwenye Nearby products na kwenye ukurasa wa orodha ya maduka (Sellers). Chagua picha ya mbele ya duka ili mteja akifikia atambue haraka."
-                            : "This photo will be shown on Nearby products and on the Sellers list page. Use a clear front view of your shop so customers can recognize it quickly."}
+                          {tx("shopImageHelpText")}
                         </p>
                       </div>
                     </div>
@@ -936,28 +869,17 @@ const SellerProfilePage: React.FC = () => {
                   <>
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 gap-2">
                       <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                        {isSw ? "Location ya biashara" : "Business location"}
+                        {tx("locationTitle")}
                       </h3>
-                      <button
-                        type="button"
-                        onClick={handleUseMyLocation}
-                        disabled={geoLoading}
-                        className="px-3 py-1.5 rounded-full border border-orange-500 text-[11px] font-medium text-orange-600 bg-white dark:bg-slate-900 hover:bg-orange-50 dark:hover:bg-orange-500/10 disabled:opacity-60"
-                      >
-                        {geoLoading
-                          ? isSw
-                            ? "Inatafuta location..."
-                            : "Detecting..."
-                          : isSw
-                          ? "Tumia location ya sasa"
-                          : "Use my current location"}
-                      </button>
+                      <p className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400">
+                        {tx("locationSubtitle")}
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Anuani (mtaa / jengo)" : "Address"}
+                          {tx("addressLabel")}
                         </label>
                         <input
                           name="location.address"
@@ -969,7 +891,7 @@ const SellerProfilePage: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Jiji / mji" : "City"}
+                          {tx("cityLabel")}
                         </label>
                         <input
                           name="location.city"
@@ -981,7 +903,7 @@ const SellerProfilePage: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Mkoa / state" : "State"}
+                          {tx("stateLabel")}
                         </label>
                         <input
                           name="location.state"
@@ -992,7 +914,7 @@ const SellerProfilePage: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Nchi" : "Country"}
+                          {tx("countryLabel")}
                         </label>
                         <input
                           name="location.country"
@@ -1004,7 +926,7 @@ const SellerProfilePage: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          {isSw ? "Postal code" : "Postal code"}
+                          {tx("postalCodeLabel")}
                         </label>
                         <input
                           name="location.postal_code"
@@ -1018,7 +940,7 @@ const SellerProfilePage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          Latitude
+                          {tx("latitudeLabel")}
                         </label>
                         <input
                           name="location.latitude"
@@ -1031,7 +953,7 @@ const SellerProfilePage: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-700 dark:text-slate-200 mb-1">
-                          Longitude
+                          {tx("longitudeLabel")}
                         </label>
                         <input
                           name="location.longitude"
@@ -1045,11 +967,22 @@ const SellerProfilePage: React.FC = () => {
                     </div>
 
                     <div className="mt-3">
-                      <GoogleMapPreview center={mapCenter} height="260px" />
+                      <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                        <GoogleMapPreview center={mapCenter} height="260px" />
+                        <button
+                          type="button"
+                          onClick={handleUseMyLocation}
+                          disabled={geoLoading}
+                          className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 dark:bg-slate-900/90 border border-orange-500 text-[11px] font-medium text-orange-600 dark:text-orange-300 shadow-sm hover:bg-white dark:hover:bg-slate-900 disabled:opacity-60"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          {geoLoading
+                            ? tx("mapDetecting")
+                            : tx("mapUseCurrent")}
+                        </button>
+                      </div>
                       <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                        {isSw
-                          ? "Ramani inaonyesha location kulingana na latitude & longitude ulizoweka."
-                          : "Map shows the position based on the latitude & longitude you entered."}
+                        {tx("mapHelpText")}
                       </p>
                     </div>
                   </>
@@ -1067,9 +1000,7 @@ const SellerProfilePage: React.FC = () => {
                         }
                         className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-slate-300 dark:border-slate-600 text-[11px] text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
                       >
-                        {isSw
-                          ? "Rudi hatua iliyotangulia"
-                          : "Back to previous step"}
+                        {tx("backToPreviousStep")}
                       </button>
                     )}
                   </div>
@@ -1080,19 +1011,11 @@ const SellerProfilePage: React.FC = () => {
                   >
                     {saving
                       ? activeStep === "profile"
-                        ? isSw
-                          ? "Inahifadhi wasifu..."
-                          : "Saving profile..."
-                        : isSw
-                        ? "Inahifadhi location..."
-                        : "Saving location..."
+                        ? tx("savingProfile")
+                        : tx("savingLocation")
                       : activeStep === "profile"
-                      ? isSw
-                        ? "Hifadhi na nenda hatua inayofuata"
-                        : "Save & go to next step"
-                      : isSw
-                      ? "Hifadhi wasifu + location"
-                      : "Save profile + location"}
+                      ? tx("saveAndNext")
+                      : tx("saveProfileAndLocation")}
                   </button>
                 </div>
               </form>
@@ -1104,12 +1027,10 @@ const SellerProfilePage: React.FC = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {isSw ? "Bidhaa zako" : "Your products"}
+                      {tx("productsTitle")}
                     </h3>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {isSw
-                        ? "Hizi ni bidhaa zote zilizounganishwa na duka lako. Hatua hii ni ya hiari."
-                        : "These are all products linked to your shop. This step is optional."}
+                      {tx("productsSubtitle")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1118,20 +1039,20 @@ const SellerProfilePage: React.FC = () => {
                       onClick={() => setActiveStep("location")}
                       className="hidden sm:inline-flex px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-[11px] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      {isSw ? "Rudi location" : "Back to location"}
+                      {tx("backToLocation")}
                     </button>
                     <Link
                       to="/products/new"
                       className="px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-50 text-white dark:text-slate-900 text-[11px] font-semibold hover:bg-black dark:hover:bg-white"
                     >
-                      {isSw ? "+ Ongeza bidhaa mpya" : "+ Add new product"}
+                      {tx("productsAddNew")}
                     </Link>
                     {sellerId && (
                       <Link
                         to={`/shops/${sellerId}`}
                         className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                       >
-                        {isSw ? "Tazama duka kwa wateja" : "View public shop"}
+                        {tx("productsViewPublic")}
                       </Link>
                     )}
                   </div>
@@ -1139,9 +1060,7 @@ const SellerProfilePage: React.FC = () => {
 
                 {loadingProducts ? (
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isSw
-                      ? "Inapakia bidhaa zako..."
-                      : "Loading your products..."}
+                    {tx("productsLoading")}
                   </div>
                 ) : productsError ? (
                   <div className="text-[11px] text-red-600 bg-red-50 dark:bg-red-950/40 p-2 rounded border border-red-100 dark:border-red-900">
@@ -1149,9 +1068,7 @@ const SellerProfilePage: React.FC = () => {
                   </div>
                 ) : myProducts.length === 0 ? (
                   <div className="text-[11px] text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                    {isSw
-                      ? "Bado hujaongeza bidhaa yoyote. Unaweza kuendelea kutumia mfumo bila kuongeza bidhaa sasa."
-                      : "You don't have any products yet. You can still continue using the system without adding products now."}
+                    {tx("productsEmpty")}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
@@ -1162,17 +1079,19 @@ const SellerProfilePage: React.FC = () => {
                           key={p.id}
                           className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col"
                         >
-                          {img ? (
-                            <img
-                              src={img}
-                              alt={p.name}
-                              className="w-full h-32 object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-32 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 text-[11px]">
-                              {isSw ? "Hakuna picha" : "No image"}
-                            </div>
-                          )}
+                          <div className="w-full aspect-4/3 bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+                            {img ? (
+                              <img
+                                src={img}
+                                alt={p.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-slate-400 dark:text-slate-500 text-[11px]">
+                                {tx("productsNoImage")}
+                              </span>
+                            )}
+                          </div>
                           <div className="p-3 flex flex-col gap-1 flex-1">
                             <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-50 line-clamp-2">
                               {p.name}
@@ -1182,25 +1101,21 @@ const SellerProfilePage: React.FC = () => {
                             </div>
                             <div className="text-[10px] text-slate-500 dark:text-slate-400">
                               {p.is_active
-                                ? isSw
-                                  ? "Inaonekana kwa wateja"
-                                  : "Active"
-                                : isSw
-                                ? "Imefichwa"
-                                : "Hidden"}
+                                ? tx("productVisible")
+                                : tx("productHidden")}
                             </div>
                             <div className="mt-2 flex items-center gap-2 text-[11px]">
                               <Link
                                 to={`/products/${p.id}`}
                                 className="px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-50 text-white dark:text-slate-900 hover:bg-black dark:hover:bg-white"
                               >
-                                {isSw ? "Tazama" : "Preview"}
+                                {tx("productPreviewButton")}
                               </Link>
                               <Link
                                 to={`/products/${p.id}/edit`}
                                 className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                               >
-                                {isSw ? "Hariri" : "Edit"}
+                                {tx("productEditButton")}
                               </Link>
                             </div>
                           </div>

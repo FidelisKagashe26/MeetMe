@@ -90,9 +90,9 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "icon", "created_at")
-    search_fields = ("name",)
-
+    list_display = ("id", "name", "seller", "icon", "created_at")
+    search_fields = ("name", "seller__business_name")
+    list_filter = ("seller",)
 
 @admin.register(ProductLike)
 class ProductLikeAdmin(admin.ModelAdmin):

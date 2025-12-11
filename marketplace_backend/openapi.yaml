@@ -383,7 +383,12 @@ paths:
   /api/categories/:
     get:
       operationId: categories_list
-      description: ViewSet for product categories
+      description: |-
+        ViewSet for product categories
+
+        - GET /api/categories/?seller_id=<id>  => categories za duka hilo
+        - GET /api/categories/?mine=1         => categories za duka la current seller
+        - POST /api/categories/               => tengeneza category mpya kwa duka langu
       parameters:
       - name: page
         required: false
@@ -412,7 +417,12 @@ paths:
           description: ''
     post:
       operationId: categories_create
-      description: ViewSet for product categories
+      description: |-
+        ViewSet for product categories
+
+        - GET /api/categories/?seller_id=<id>  => categories za duka hilo
+        - GET /api/categories/?mine=1         => categories za duka la current seller
+        - POST /api/categories/               => tengeneza category mpya kwa duka langu
       tags:
       - categories
       requestBody:
@@ -440,7 +450,12 @@ paths:
   /api/categories/{id}/:
     get:
       operationId: categories_retrieve
-      description: ViewSet for product categories
+      description: |-
+        ViewSet for product categories
+
+        - GET /api/categories/?seller_id=<id>  => categories za duka hilo
+        - GET /api/categories/?mine=1         => categories za duka la current seller
+        - POST /api/categories/               => tengeneza category mpya kwa duka langu
       parameters:
       - in: path
         name: id
@@ -463,7 +478,12 @@ paths:
           description: ''
     put:
       operationId: categories_update
-      description: ViewSet for product categories
+      description: |-
+        ViewSet for product categories
+
+        - GET /api/categories/?seller_id=<id>  => categories za duka hilo
+        - GET /api/categories/?mine=1         => categories za duka la current seller
+        - POST /api/categories/               => tengeneza category mpya kwa duka langu
       parameters:
       - in: path
         name: id
@@ -497,7 +517,12 @@ paths:
           description: ''
     patch:
       operationId: categories_partial_update
-      description: ViewSet for product categories
+      description: |-
+        ViewSet for product categories
+
+        - GET /api/categories/?seller_id=<id>  => categories za duka hilo
+        - GET /api/categories/?mine=1         => categories za duka la current seller
+        - POST /api/categories/               => tengeneza category mpya kwa duka langu
       parameters:
       - in: path
         name: id
@@ -530,7 +555,12 @@ paths:
           description: ''
     delete:
       operationId: categories_destroy
-      description: ViewSet for product categories
+      description: |-
+        ViewSet for product categories
+
+        - GET /api/categories/?seller_id=<id>  => categories za duka hilo
+        - GET /api/categories/?mine=1         => categories za duka la current seller
+        - POST /api/categories/               => tengeneza category mpya kwa duka langu
       parameters:
       - in: path
         name: id
@@ -546,6 +576,22 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/categories/mine/:
+    get:
+      operationId: categories_mine_retrieve
+      description: 'Shortcut: GET /api/categories/mine/ => categories za duka langu.'
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
   /api/conversations/:
     get:
       operationId: conversations_list
@@ -937,12 +983,9 @@ paths:
   /api/location/distance/:
     post:
       operationId: location_distance_create
-      description: |-
-        Calculate distance between two points (km + miles) using **Google Maps**.
-
-        - Inatumia Distance Matrix API (mode=driving, units=metric).
-        - Input: latitude1, longitude1, latitude2, longitude2.
-      summary: Calculate distance between two points using Google Distance Matrix
+      description: Calculate distance between two points (km + miles) using Haversine
+        formula
+      summary: Calculate distance between two points using Haversine
       tags:
       - location
       requestBody:
@@ -1955,9 +1998,8 @@ paths:
         /api/products/
 
         - Inatumia filters za kawaida (search, category, price, location ya mji).
-        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product
-          kwa kutumia Google Distance Matrix, inapanga kwa distance ASC
-          bila ku-cut off kwa radius.
+        - Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,
+          inapanga kwa distance ASC bila ku-cut off kwa radius.
         - Inarudisha ARRAY tu, hakuna pagination ya backend.
       parameters:
       - name: ordering
@@ -1998,9 +2040,8 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
-          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
-          kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2036,9 +2077,8 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
-          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
-          kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2069,9 +2109,8 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
-          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
-          kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2113,9 +2152,8 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
-          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
-          kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2156,9 +2194,8 @@ paths:
 
         MUHIMU:
         - /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).
-        - Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia
-          Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila
-          kuweka limit ya radius.
+        - Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA
+          kwa ukaribu (distance asc) bila kuweka limit ya radius.
         - `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama
           imekuja kama "Current location" n.k. kutoka frontend – hiyo tuna-ignore
           kama filter ili isilete EMPTY results.
@@ -2231,8 +2268,7 @@ paths:
         {
             "latitude": ...,
             "longitude": ...,
-            "radius": 10,         # hapa kwa sasa hatuitumii kufilisha backend,
-                                   # tunasort tu kwa distance.
+            "radius": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu
             "category": "...",
             "min_price": ...,
             "max_price": ...,
@@ -2472,13 +2508,13 @@ paths:
       - sellers
       requestBody:
         content:
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/SellerProfileCreateRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/SellerProfileCreateRequest'
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/SellerProfileCreateRequest'
         required: true
@@ -2530,13 +2566,13 @@ paths:
       - sellers
       requestBody:
         content:
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/SellerProfileRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/SellerProfileRequest'
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/SellerProfileRequest'
         required: true
@@ -2564,13 +2600,13 @@ paths:
       - sellers
       requestBody:
         content:
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/PatchedSellerProfileRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedSellerProfileRequest'
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedSellerProfileRequest'
       security:
@@ -2601,6 +2637,33 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sellers/{id}/categories/:
+    get:
+      operationId: sellers_categories_retrieve
+      description: |-
+        GET /api/sellers/<id>/categories/
+
+        Categories za duka hili (zikiwa na product_count).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this seller profile.
+        required: true
+      tags:
+      - sellers
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellerProfile'
+          description: ''
   /api/sellers/{id}/products/:
     get:
       operationId: sellers_products_retrieve
@@ -2669,7 +2732,7 @@ paths:
     get:
       operationId: sellers_nearby_retrieve
       description: |-
-        Get nearby sellers based on user's location (Google Distance Matrix)
+        Get nearby sellers based on user's location (Haversine)
 
         - Hakuna tena LIMIT ya idadi ya maduka.
         - Kama `radius` imepelekwa → tunatumia filter_by_radius (km).
@@ -2705,6 +2768,13 @@ components:
         icon:
           type: string
           maxLength: 50
+        seller_id:
+          type: integer
+          readOnly: true
+        seller_name:
+          type: string
+          readOnly: true
+          nullable: true
         product_count:
           type: integer
           readOnly: true
@@ -2717,6 +2787,8 @@ components:
       - id
       - name
       - product_count
+      - seller_id
+      - seller_name
     CategoryRequest:
       type: object
       description: Serializer for Category model
@@ -4496,10 +4568,6 @@ components:
           type: string
           format: uri
           nullable: true
-        shop_image:
-          type: string
-          format: uri
-          nullable: true
         location:
           $ref: '#/components/schemas/Location'
       required:
@@ -4519,10 +4587,6 @@ components:
           type: string
           maxLength: 20
         logo:
-          type: string
-          format: binary
-          nullable: true
-        shop_image:
           type: string
           format: binary
           nullable: true

@@ -602,7 +602,7 @@
         "/api/categories/": {
             "get": {
                 "operationId": "categories_list",
-                "description": "ViewSet for product categories",
+                "description": "ViewSet for product categories\n\n- GET /api/categories/?seller_id=<id>  => categories za duka hilo\n- GET /api/categories/?mine=1         => categories za duka la current seller\n- POST /api/categories/               => tengeneza category mpya kwa duka langu",
                 "parameters": [
                     {
                         "name": "page",
@@ -650,7 +650,7 @@
             },
             "post": {
                 "operationId": "categories_create",
-                "description": "ViewSet for product categories",
+                "description": "ViewSet for product categories\n\n- GET /api/categories/?seller_id=<id>  => categories za duka hilo\n- GET /api/categories/?mine=1         => categories za duka la current seller\n- POST /api/categories/               => tengeneza category mpya kwa duka langu",
                 "tags": [
                     "categories"
                 ],
@@ -699,7 +699,7 @@
         "/api/categories/{id}/": {
             "get": {
                 "operationId": "categories_retrieve",
-                "description": "ViewSet for product categories",
+                "description": "ViewSet for product categories\n\n- GET /api/categories/?seller_id=<id>  => categories za duka hilo\n- GET /api/categories/?mine=1         => categories za duka la current seller\n- POST /api/categories/               => tengeneza category mpya kwa duka langu",
                 "parameters": [
                     {
                         "in": "path",
@@ -738,7 +738,7 @@
             },
             "put": {
                 "operationId": "categories_update",
-                "description": "ViewSet for product categories",
+                "description": "ViewSet for product categories\n\n- GET /api/categories/?seller_id=<id>  => categories za duka hilo\n- GET /api/categories/?mine=1         => categories za duka la current seller\n- POST /api/categories/               => tengeneza category mpya kwa duka langu",
                 "parameters": [
                     {
                         "in": "path",
@@ -796,7 +796,7 @@
             },
             "patch": {
                 "operationId": "categories_partial_update",
-                "description": "ViewSet for product categories",
+                "description": "ViewSet for product categories\n\n- GET /api/categories/?seller_id=<id>  => categories za duka hilo\n- GET /api/categories/?mine=1         => categories za duka la current seller\n- POST /api/categories/               => tengeneza category mpya kwa duka langu",
                 "parameters": [
                     {
                         "in": "path",
@@ -853,7 +853,7 @@
             },
             "delete": {
                 "operationId": "categories_destroy",
-                "description": "ViewSet for product categories",
+                "description": "ViewSet for product categories\n\n- GET /api/categories/?seller_id=<id>  => categories za duka hilo\n- GET /api/categories/?mine=1         => categories za duka la current seller\n- POST /api/categories/               => tengeneza category mpya kwa duka langu",
                 "parameters": [
                     {
                         "in": "path",
@@ -879,6 +879,35 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/categories/mine/": {
+            "get": {
+                "operationId": "categories_mine_retrieve",
+                "description": "Shortcut: GET /api/categories/mine/ => categories za duka langu.",
+                "tags": [
+                    "categories"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Category"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -1529,8 +1558,8 @@
         "/api/location/distance/": {
             "post": {
                 "operationId": "location_distance_create",
-                "description": "Calculate distance between two points (km + miles) using **Google Maps**.\n\n- Inatumia Distance Matrix API (mode=driving, units=metric).\n- Input: latitude1, longitude1, latitude2, longitude2.",
-                "summary": "Calculate distance between two points using Google Distance Matrix",
+                "description": "Calculate distance between two points (km + miles) using Haversine formula",
+                "summary": "Calculate distance between two points using Haversine",
                 "tags": [
                     "location"
                 ],
@@ -3228,7 +3257,7 @@
         "/api/products/": {
             "get": {
                 "operationId": "products_list",
-                "description": "/api/products/\n\n- Inatumia filters za kawaida (search, category, price, location ya mji).\n- Kama lat & lng zimetumwa → ina-add distance_km kwa kila product\n  kwa kutumia Google Distance Matrix, inapanga kwa distance ASC\n  bila ku-cut off kwa radius.\n- Inarudisha ARRAY tu, hakuna pagination ya backend.",
+                "description": "/api/products/\n\n- Inatumia filters za kawaida (search, category, price, location ya mji).\n- Kama lat & lng zimetumwa → ina-add distance_km kwa kila product,\n  inapanga kwa distance ASC bila ku-cut off kwa radius.\n- Inarudisha ARRAY tu, hakuna pagination ya backend.",
                 "parameters": [
                     {
                         "name": "ordering",
@@ -3285,7 +3314,7 @@
             },
             "post": {
                 "operationId": "products_create",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "tags": [
                     "products"
                 ],
@@ -3334,7 +3363,7 @@
         "/api/products/{id}/": {
             "get": {
                 "operationId": "products_retrieve",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3373,7 +3402,7 @@
             },
             "put": {
                 "operationId": "products_update",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3431,7 +3460,7 @@
             },
             "patch": {
                 "operationId": "products_partial_update",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3488,7 +3517,7 @@
             },
             "delete": {
                 "operationId": "products_destroy",
-                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product kwa kutumia\n  Google Distance Matrix na KUPANGA kwa ukaribu (distance asc) bila\n  kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
+                "description": "ViewSet for products with location-based SORTING ONLY.\n\nMUHIMU:\n- /api/products/ daima inarudisha ARRAY ya products (hakuna pagination ya backend).\n- Ukipeleka lat & lng → tunahesabu distance kwa kila product na KUPANGA\n  kwa ukaribu (distance asc) bila kuweka limit ya radius.\n- `location` (mji/mkoa) inatumika kama filter ya city, isipokuwa kama\n  imekuja kama \"Current location\" n.k. kutoka frontend – hiyo tuna-ignore\n  kama filter ili isilete EMPTY results.",
                 "parameters": [
                     {
                         "in": "path",
@@ -3580,7 +3609,7 @@
         "/api/products/search_nearby/": {
             "post": {
                 "operationId": "products_search_nearby_create",
-                "description": "Advanced nearby search via POST body (still guest-friendly)\n\nBody (NearbySearchSerializer):\n{\n    \"latitude\": ...,\n    \"longitude\": ...,\n    \"radius\": 10,         # hapa kwa sasa hatuitumii kufilisha backend,\n                           # tunasort tu kwa distance.\n    \"category\": \"...\",\n    \"min_price\": ...,\n    \"max_price\": ...,\n    \"sort_by\": \"distance\" | \"price\" | \"rating\"\n}",
+                "description": "Advanced nearby search via POST body (still guest-friendly)\n\nBody (NearbySearchSerializer):\n{\n    \"latitude\": ...,\n    \"longitude\": ...,\n    \"radius\": 10,         # hapa HATUITUMII tena kama LIMIT, tunasort tu\n    \"category\": \"...\",\n    \"min_price\": ...,\n    \"max_price\": ...,\n    \"sort_by\": \"distance\" | \"price\" | \"rating\"\n}",
                 "tags": [
                     "products"
                 ],
@@ -3977,7 +4006,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileCreateRequest"
                             }
@@ -3987,7 +4016,7 @@
                                 "$ref": "#/components/schemas/SellerProfileCreateRequest"
                             }
                         },
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileCreateRequest"
                             }
@@ -4076,7 +4105,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileRequest"
                             }
@@ -4086,7 +4115,7 @@
                                 "$ref": "#/components/schemas/SellerProfileRequest"
                             }
                         },
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/SellerProfileRequest"
                             }
@@ -4134,7 +4163,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/PatchedSellerProfileRequest"
                             }
@@ -4144,7 +4173,7 @@
                                 "$ref": "#/components/schemas/PatchedSellerProfileRequest"
                             }
                         },
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/PatchedSellerProfileRequest"
                             }
@@ -4200,6 +4229,47 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/sellers/{id}/categories/": {
+            "get": {
+                "operationId": "sellers_categories_retrieve",
+                "description": "GET /api/sellers/<id>/categories/\n\nCategories za duka hili (zikiwa na product_count).",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this seller profile.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "sellers"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SellerProfile"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -4318,7 +4388,7 @@
         "/api/sellers/nearby/": {
             "get": {
                 "operationId": "sellers_nearby_retrieve",
-                "description": "Get nearby sellers based on user's location (Google Distance Matrix)\n\n- Hakuna tena LIMIT ya idadi ya maduka.\n- Kama `radius` imepelekwa → tunatumia filter_by_radius (km).\n- Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.\n- Pagination hatutumii hapa, tunarudisha list yote kwa frontend.",
+                "description": "Get nearby sellers based on user's location (Haversine)\n\n- Hakuna tena LIMIT ya idadi ya maduka.\n- Kama `radius` imepelekwa → tunatumia filter_by_radius (km).\n- Kama `radius` haijapelekwa → tunapanga tu kwa distance bila kufilisha.\n- Pagination hatutumii hapa, tunarudisha list yote kwa frontend.",
                 "tags": [
                     "sellers"
                 ],
@@ -4367,6 +4437,15 @@
                         "type": "string",
                         "maxLength": 50
                     },
+                    "seller_id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "seller_name": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "product_count": {
                         "type": "integer",
                         "readOnly": true
@@ -4381,7 +4460,9 @@
                     "created_at",
                     "id",
                     "name",
-                    "product_count"
+                    "product_count",
+                    "seller_id",
+                    "seller_name"
                 ]
             },
             "CategoryRequest": {
@@ -6630,11 +6711,6 @@
                         "format": "uri",
                         "nullable": true
                     },
-                    "shop_image": {
-                        "type": "string",
-                        "format": "uri",
-                        "nullable": true
-                    },
                     "location": {
                         "$ref": "#/components/schemas/Location"
                     }
@@ -6661,11 +6737,6 @@
                         "maxLength": 20
                     },
                     "logo": {
-                        "type": "string",
-                        "format": "binary",
-                        "nullable": true
-                    },
-                    "shop_image": {
                         "type": "string",
                         "format": "binary",
                         "nullable": true

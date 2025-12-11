@@ -312,9 +312,9 @@ const ShopPage: React.FC = () => {
                     />
                   ) : (
                     <div className="w-full h-full bg-linear-to-r from-slate-800 via-slate-700 to-slate-900 flex items-center justify-center text-xs md:text-sm text-slate-200">
-                      {isSw
+                      {/* {isSw
                         ? "Hakuna picha ya duka — unaweza kuongeza kutoka kwenye wasifu wa muuzaji."
-                        : "No shop photo yet — you can upload one from your seller profile."}
+                        : "No shop photo yet — you can upload one from your seller profile."} */}
                     </div>
                   )}
 

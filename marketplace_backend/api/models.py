@@ -215,8 +215,19 @@ class Location(models.Model):
 class Category(models.Model):
     """
     Product categories
+
+    Ikiwa `seller` ni NULL => ni global category (common kwa shops zote, kama unataka).
+    Ikiwa `seller` imejazwa => category hii ni ya duka hilo tu.
     """
-    name = models.CharField(max_length=100, unique=True)
+    seller = models.ForeignKey(
+        SellerProfile,
+        on_delete=models.CASCADE,
+        related_name="categories",
+        null=True,
+        blank=True,
+        help_text="If set, this category belongs only to this seller/shop.",
+    )
+    name = models.CharField(max_length=100)  
     description = models.TextField(blank=True)
     icon = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -225,10 +236,16 @@ class Category(models.Model):
         db_table = "categories"
         ordering = ["name"]
         verbose_name_plural = "Categories"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["seller", "name"],
+                name="unique_category_name_per_seller",
+            ),
+        ]
 
     def __str__(self):
-        return self.name
-
+        owner = self.seller.business_name if self.seller else "GLOBAL"
+        return f"{self.name} ({owner})"
 
 class Product(models.Model):
     """

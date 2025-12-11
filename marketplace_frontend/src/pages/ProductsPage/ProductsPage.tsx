@@ -53,6 +53,15 @@ interface Product {
   is_liked?: boolean;
 }
 
+type ProductsApiResponse =
+  | Product[]
+  | {
+      results: Product[];
+      count?: number;
+      next?: string | null;
+      previous?: string | null;
+    };
+
 interface Coords {
   lat: number;
   lng: number;
@@ -203,21 +212,34 @@ const ProductsPage: React.FC = () => {
         params.lng = activeCoords.lng;
       }
 
-      const res = await apiClient.get<Product[]>("/api/products/", {
+      // Hapa tunatumia generic yenye union type yetu
+      const res = await apiClient.get<ProductsApiResponse>("/api/products/", {
         params,
       });
 
-      const data = Array.isArray(res.data) ? res.data : [];
-      setProducts(data);
+      const raw = res.data;
+      let items: Product[] = [];
+
+      if (Array.isArray(raw)) {
+        // Case 1: backend anarudisha array ya moja kwa moja
+        items = raw;
+      } else if (raw && Array.isArray(raw.results)) {
+        // Case 2: DRF pagination: { results: [...] }
+        items = raw.results;
+      } else {
+        items = [];
+      }
+
+      setProducts(items);
     } catch (err) {
       console.error(err);
-      // tunaacha message ya asili, tunaitafsiri wakati wa ku-render
       setError("Failed to load products. Please try again in a moment.");
       setProducts([]);
     } finally {
       setLoading(false);
     }
   }, [activeCoords, activeLocation, activeQuery]);
+
 
   useEffect(() => {
     void fetchProducts();

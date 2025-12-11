@@ -412,7 +412,7 @@ class SellerProfileCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SellerProfile
-        fields = ["business_name", "description", "phone_number", "logo", "shop_image", "location"]
+        fields = ["business_name", "description", "phone_number", "logo", "location"]
 
     def create(self, validated_data):
         location_data = validated_data.pop("location")
@@ -431,6 +431,15 @@ class CategorySerializer(serializers.ModelSerializer):
     """
 
     product_count = serializers.IntegerField(read_only=True, required=False)
+    seller_id = serializers.IntegerField(
+        source="seller.id",
+        read_only=True,
+    )
+    seller_name = serializers.CharField(
+        source="seller.business_name",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Category
@@ -439,10 +448,12 @@ class CategorySerializer(serializers.ModelSerializer):
             "name",
             "description",
             "icon",
+            "seller_id",
+            "seller_name",
             "product_count",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "seller_id", "seller_name", "product_count"]
 
 
 # =========================
@@ -681,6 +692,31 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             "is_active",
             "image",
         ]
+
+    def validate_category_id(self, value):
+        """
+        Hakikisha category anayochagua ni ya duka lake (au none).
+        """
+        if value is None:
+            return None
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if not user or not user.is_authenticated:
+            raise serializers.ValidationError("Authentication required.")
+
+        try:
+            seller_profile = user.seller_profile
+        except SellerProfile.DoesNotExist:
+            raise serializers.ValidationError("You must create a seller profile first.")
+
+        try:
+            Category.objects.get(id=value, seller=seller_profile)
+        except Category.DoesNotExist:
+            raise serializers.ValidationError("Invalid category for this shop.")
+
+        return value
 
     def create(self, validated_data):
         category_id = validated_data.pop("category_id", None)
