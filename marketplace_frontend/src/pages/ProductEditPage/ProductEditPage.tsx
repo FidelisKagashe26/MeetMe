@@ -1,9 +1,12 @@
+// src/pages/ProductEditPage/ProductEditPage.tsx
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import apiClient from "../lib/apiClient";
-import { useAuth } from "../contexts/AuthContext";
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
+import apiClient from "../../lib/apiClient";
+import { useAuth } from "../../contexts/AuthContext";
+import MainHeader from "../../components/MainHeader";
+import MainFooter from "../../components/MainFooter";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getProductEditPageTexts } from "./ProductEditPageTexts";
 
 interface ProductResponse {
   id: number;
@@ -35,8 +38,10 @@ interface ProductImageResponse {
 
 const ProductEditPage: React.FC = () => {
   const { id } = useParams();
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const texts = getProductEditPageTexts(language);
+  const { user } = useAuth();
 
   const [form, setForm] = useState<ProductEditForm>({
     name: "",
@@ -62,7 +67,7 @@ const ProductEditPage: React.FC = () => {
       setError(null);
       try {
         const res = await apiClient.get<ProductResponse>(
-          `/api/products/${id}/`
+          `/api/products/${id}/`,
         );
         const p = res.data;
 
@@ -85,22 +90,24 @@ const ProductEditPage: React.FC = () => {
         }
       } catch (err: unknown) {
         console.error(err);
-        setError("Failed to load product.");
+        setError(texts.errorLoadProduct);
       } finally {
         setLoading(false);
       }
     };
 
     void loadProduct();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Hakuna user → onyesha ujumbe tu, bila logout button
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
         <MainHeader />
         <main className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 text-sm text-slate-900 dark:text-slate-100">
-            You must be logged in to edit products.
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 text-sm text-slate-900 dark:text-slate-100 max-w-md text-center">
+            {texts.authRequired}
           </div>
         </main>
         <MainFooter />
@@ -109,7 +116,7 @@ const ProductEditPage: React.FC = () => {
   }
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const target = e.target;
     const { name, value } = target;
@@ -141,19 +148,18 @@ const ProductEditPage: React.FC = () => {
     const file = e.target.files?.[0] || null;
     if (!file) {
       setImageFile(null);
-      // hatufuti preview ya zamani automatically hapa
       return;
     }
 
     if (!file.type.startsWith("image/")) {
-      setError("Please upload a valid image file.");
+      setError(texts.errorInvalidImage);
       setImageFile(null);
       return;
     }
 
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError("Image is too large. Max size is 5MB.");
+      setError(texts.errorImageTooLarge);
       setImageFile(null);
       return;
     }
@@ -163,12 +169,9 @@ const ProductEditPage: React.FC = () => {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  /**
-   * Upload picha mpya ya product kupitia /api/product-images/
-   */
   const uploadProductImage = async (
     productId: number,
-    file: File
+    file: File,
   ): Promise<string | null> => {
     setUploadingImage(true);
     try {
@@ -178,7 +181,7 @@ const ProductEditPage: React.FC = () => {
 
       const res = await apiClient.post<ProductImageResponse>(
         "/api/product-images/",
-        formData
+        formData,
       );
 
       const imageUrl = res.data.image_url ?? res.data.image;
@@ -186,7 +189,6 @@ const ProductEditPage: React.FC = () => {
         return null;
       }
 
-      // patch product ili image_url yawe updated
       try {
         await apiClient.patch(`/api/products/${productId}/`, {
           image_url: imageUrl,
@@ -217,7 +219,6 @@ const ProductEditPage: React.FC = () => {
       currency: form.currency,
       stock_quantity: form.stock_quantity,
       is_active: form.is_active,
-      // hatutumii image_url hapa; picha inahadndlewa na uploadProductImage
     };
 
     try {
@@ -233,9 +234,7 @@ const ProductEditPage: React.FC = () => {
           }
         } catch (uploadErr) {
           console.error(uploadErr);
-          setError(
-            "Product updated, but failed to upload new image. Try again later."
-          );
+          setError(texts.errorUploadImageAfterUpdate);
         }
       }
 
@@ -251,7 +250,7 @@ const ProductEditPage: React.FC = () => {
       if (data && typeof data === "object") {
         setError(JSON.stringify(data));
       } else {
-        setError("Failed to update product.");
+        setError(texts.errorUpdateProduct);
       }
     } finally {
       setSaving(false);
@@ -262,42 +261,36 @@ const ProductEditPage: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors">
       <MainHeader />
 
-      <main className="flex-1 max-w-3xl mx-auto py-8 px-4">
-        <div className="mb-3 flex items-center justify-between">
+      <main className="flex-1 max-w-3xl mx-auto py-6 md:py-8 px-4">
+        {/* Top bar – back + link to all products (no logout) */}
+        <div className="mb-4 flex items-center justify-between gap-3">
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="text-xs text-slate-600 dark:text-slate-300 hover:underline"
+            className="text-xs md:text-sm text-slate-600 dark:text-slate-300 hover:underline"
           >
-            ← Back
+            ← {texts.back}
           </button>
-          <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
-            <Link
-              to="/products"
-              className="hover:underline text-slate-700 dark:text-slate-100"
-            >
-              All products
-            </Link>
-            <button
-              onClick={logout}
-              className="px-3 py-1 rounded-full bg-red-500 text-white text-xs"
-            >
-              Logout
-            </button>
-          </div>
+          <Link
+            to="/products"
+            className="text-xs md:text-sm text-slate-700 dark:text-slate-100 hover:underline"
+          >
+            {texts.allProducts}
+          </Link>
         </div>
 
-        <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-50">
-          Edit product
+        <h2 className="text-lg md:text-xl font-semibold mb-4 text-slate-900 dark:text-slate-50">
+          {texts.pageTitle}
         </h2>
 
         {loading && (
           <div className="text-sm text-slate-600 dark:text-slate-300">
-            Loading...
+            {texts.loading}
           </div>
         )}
 
         {error && (
-          <div className="mb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/40 p-2 rounded-lg">
+          <div className="mb-3 text-xs md:text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/40 p-2 md:p-3 rounded-lg">
             {error}
           </div>
         )}
@@ -309,8 +302,8 @@ const ProductEditPage: React.FC = () => {
           >
             {/* Name */}
             <div className="space-y-1">
-              <label className="block text-xs text-slate-700 dark:text-slate-200">
-                Name
+              <label className="block text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                {texts.formNameLabel}
               </label>
               <input
                 name="name"
@@ -323,8 +316,8 @@ const ProductEditPage: React.FC = () => {
 
             {/* Description */}
             <div className="space-y-1">
-              <label className="block text-xs text-slate-700 dark:text-slate-200">
-                Description
+              <label className="block text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                {texts.formDescriptionLabel}
               </label>
               <textarea
                 name="description"
@@ -339,8 +332,8 @@ const ProductEditPage: React.FC = () => {
             {/* Price & Currency */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="block text-xs text-slate-700 dark:text-slate-200">
-                  Price
+                <label className="block text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                  {texts.formPriceLabel}
                 </label>
                 <input
                   name="price"
@@ -351,8 +344,8 @@ const ProductEditPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-xs text-slate-700 dark:text-slate-200">
-                  Currency
+                <label className="block text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                  {texts.formCurrencyLabel}
                 </label>
                 <input
                   name="currency"
@@ -367,8 +360,8 @@ const ProductEditPage: React.FC = () => {
             {/* Stock & Active */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="block text-xs text-slate-700 dark:text-slate-200">
-                  Stock quantity
+                <label className="block text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                  {texts.formStockLabel}
                 </label>
                 <input
                   type="number"
@@ -379,7 +372,7 @@ const ProductEditPage: React.FC = () => {
                   className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
-              <div className="flex items-center gap-2 mt-5 md:mt-7">
+              <div className="flex items-center gap-2 mt-3 md:mt-7">
                 <input
                   type="checkbox"
                   name="is_active"
@@ -387,26 +380,25 @@ const ProductEditPage: React.FC = () => {
                   onChange={handleChange}
                   className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-slate-900 focus:ring-orange-500"
                 />
-                <span className="text-xs text-slate-700 dark:text-slate-200">
-                  Active (visible to customers)
+                <span className="text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                  {texts.formActiveLabel}
                 </span>
               </div>
             </div>
 
             {/* Image upload */}
             <div className="space-y-2">
-              <label className="block text-xs text-slate-700 dark:text-slate-200">
-                Product image
-                <span className="text-slate-400 dark:text-slate-500 text-[10px]">
-                  {" "}
-                  (optional)
+              <label className="block text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                {texts.imageLabel}
+                <span className="text-slate-400 dark:text-slate-500 text-[10px] ml-1">
+                  {texts.imageOptionalSuffix}
                 </span>
               </label>
 
               {imagePreview && (
                 <div className="mb-2">
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                    Current image
+                  <div className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    {texts.imageCurrentLabel}
                   </div>
                   <img
                     src={imagePreview}
@@ -426,18 +418,18 @@ const ProductEditPage: React.FC = () => {
                 />
                 <label
                   htmlFor="edit-product-image"
-                  className="inline-flex items-center justify-center px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-[11px] font-medium text-slate-700 dark:text-slate-100 cursor-pointer hover:border-orange-500 hover:text-orange-600 dark:hover:border-orange-400"
+                  className="inline-flex items-center justify-center px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-[11px] md:text-xs font-medium text-slate-700 dark:text-slate-100 cursor-pointer hover:border-orange-500 hover:text-orange-600 dark:hover:border-orange-400"
                 >
-                  Change image
+                  {texts.imageChangeButton}
                 </label>
                 {imageFile && (
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
+                  <span className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
                     {imageFile.name}
                   </span>
                 )}
                 {uploadingImage && (
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Uploading...
+                  <span className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400">
+                    {texts.imageUploadingLabel}
                   </span>
                 )}
               </div>
@@ -447,9 +439,9 @@ const ProductEditPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={saving || uploadingImage}
-                className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-60"
+                className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-slate-900 dark:bg-orange-500 text-white text-sm md:text-base font-semibold hover:bg-black disabled:opacity-60 w-full sm:w-auto"
               >
-                {saving ? "Saving..." : "Save changes"}
+                {saving ? texts.buttonSaving : texts.buttonSave}
               </button>
             </div>
           </form>

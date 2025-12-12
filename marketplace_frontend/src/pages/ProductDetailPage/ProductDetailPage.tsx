@@ -21,6 +21,12 @@ interface CategoryMini {
   name: string;
 }
 
+interface SellerFromProduct {
+  id: number;
+  business_name: string;
+  logo_url?: string | null;
+}
+
 interface ProductDetail {
   id: number;
   name: string;
@@ -34,10 +40,7 @@ interface ProductDetail {
   is_available?: boolean;
   shop_name?: string;
   seller_id?: number;
-  seller?: {
-    id: number;
-    business_name: string;
-  } | null;
+  seller?: SellerFromProduct | null;
   latitude?: string;
   longitude?: string;
 
@@ -49,7 +52,7 @@ interface ProductDetail {
   // gallery
   images?: ProductImage[];
 
-  // category info (kutoka API: Product.category: Category)
+  // category info
   category?: CategoryMini | null;
 }
 
@@ -66,10 +69,7 @@ interface SuggestionProduct {
   images?: ProductImage[];
 
   seller_id?: number;
-  seller?: {
-    id: number;
-    business_name?: string;
-  } | null;
+  seller?: SellerFromProduct | null;
 
   category?: CategoryMini | null;
 }
@@ -82,8 +82,51 @@ interface PaginatedProductList {
 }
 
 type SuggestionsApiResponse = SuggestionProduct[] | PaginatedProductList;
-
 type CategoryFilterValue = "all" | "uncategorized" | number;
+
+// helper: format price with commas (1,234,567.89)
+const formatPrice = (
+  raw: string | number | null | undefined,
+): string => {
+  if (raw === null || raw === undefined) return "";
+  const str = String(raw);
+  if (!str) return "";
+
+  const isNegative = str.startsWith("-");
+  const numeric = isNegative ? str.slice(1) : str;
+
+  const [intPartRaw, fracPart] = numeric.split(".");
+  const intPart = intPartRaw.replace(/\D/g, "") || "0";
+
+  const intFormatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  const withSign = isNegative ? `-${intFormatted}` : intFormatted;
+  return fracPart ? `${withSign}.${fracPart}` : withSign;
+};
+
+const mapProductDetailToSuggestion = (
+  p: ProductDetail,
+): SuggestionProduct => ({
+  id: p.id,
+  name: p.name,
+  description: p.description,
+  price: p.price,
+  currency: p.currency,
+  image_url: p.image_url,
+  image: p.image ?? undefined,
+  city: p.city ?? null,
+  is_available: p.is_available,
+  images: p.images,
+  seller_id: p.seller_id,
+  seller: p.seller
+    ? {
+        id: p.seller.id,
+        business_name: p.seller.business_name,
+        logo_url: p.seller.logo_url,
+      }
+    : null,
+  category: p.category ?? null,
+});
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -164,15 +207,14 @@ const ProductDetailPage: React.FC = () => {
           all = res.data.results;
         }
 
-        // hakikisha products ni za duka husika tu
-        const sameShop = all.filter(
-          (p) =>
-            (p.seller_id !== undefined && p.seller_id === sellerId) ||
-            (p.seller && p.seller.id === sellerId),
-        );
+        // bidhaa za duka husika tu
+        const sellerOnly = all.filter((p) => {
+          const sid = p.seller_id ?? p.seller?.id;
+          return sid === sellerId;
+        });
 
         // ondoa product inayotazamwa sasa
-        const others = sameShop.filter((p) => p.id !== product.id);
+        const others = sellerOnly.filter((p) => p.id !== product.id);
 
         setSuggestions(others);
       } catch (err) {
@@ -220,7 +262,7 @@ const ProductDetailPage: React.FC = () => {
     );
   };
 
-  // categories kutoka kwa product + suggestions za duka hili
+  // categories kutoka product + suggestions za duka hili
   const categoriesFromShop: CategoryMini[] = useMemo(() => {
     const map = new Map<number, CategoryMini>();
 
@@ -253,14 +295,43 @@ const ProductDetailPage: React.FC = () => {
   );
 
   const visibleSuggestions = useMemo(() => {
-    if (selectedCategory === "all") return suggestions;
-    if (selectedCategory === "uncategorized") {
-      return suggestions.filter((sp) => !sp.category);
+    if (!product) return suggestions;
+
+    const baseSuggestions = suggestions;
+
+    // all -> bidhaa zingine tu za duka
+    if (selectedCategory === "all") {
+      return baseSuggestions;
     }
-    return suggestions.filter(
+
+    const mainAsSuggestion = mapProductDetailToSuggestion(product);
+
+    // UNCATEGORIZED
+    if (selectedCategory === "uncategorized") {
+      let filtered = baseSuggestions.filter((sp) => !sp.category);
+
+      const mainMatches = !product.category;
+      if (mainMatches && !filtered.some((sp) => sp.id === product.id)) {
+        filtered = [mainAsSuggestion, ...filtered];
+      }
+
+      return filtered;
+    }
+
+    // category fulani (id)
+    let filtered = baseSuggestions.filter(
       (sp) => sp.category && sp.category.id === selectedCategory,
     );
-  }, [selectedCategory, suggestions]);
+
+    const mainMatches =
+      !!product.category && product.category.id === selectedCategory;
+
+    if (mainMatches && !filtered.some((sp) => sp.id === product.id)) {
+      filtered = [mainAsSuggestion, ...filtered];
+    }
+
+    return filtered;
+  }, [selectedCategory, suggestions, product]);
 
   if (loading) {
     return (
@@ -315,6 +386,8 @@ const ProductDetailPage: React.FC = () => {
   const shopName =
     product.shop_name || product.seller?.business_name || "Shop";
 
+  const shopLogo = product.seller?.logo_url ?? null;
+
   const mainImage = getMainImage(product);
 
   const distanceDisplay = (() => {
@@ -355,8 +428,18 @@ const ProductDetailPage: React.FC = () => {
               <div className="absolute inset-x-3 bottom-3 md:bottom-4 flex flex-col md:flex-row justify-between gap-3 pointer-events-none">
                 <div className="pointer-events-auto bg-white/95 dark:bg-slate-900/95 rounded-2xl shadow px-3 py-2 text-[11px] min-w-[200px] max-w-md">
                   <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center text-[11px] font-semibold">
-                      {shopName.charAt(0).toUpperCase()}
+                    <div className="w-9 h-9 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center text-[11px] font-semibold overflow-hidden">
+                      {shopLogo ? (
+                        <img
+                          src={shopLogo}
+                          alt={shopName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span>
+                          {shopName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="font-semibold text-slate-900 dark:text-white line-clamp-1">
@@ -395,7 +478,7 @@ const ProductDetailPage: React.FC = () => {
                       href={mapsUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[11px] font-semibold hover:bg-black dark:hover:bg-white"
+                      className="px-3 py-1.5 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[11px] font-semibold hover:bg-black.dark:hover:bg-white"
                     >
                       {texts.openInGoogleMaps}
                     </a>
@@ -445,7 +528,8 @@ const ProductDetailPage: React.FC = () => {
                       {texts.priceLabel}
                     </div>
                     <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                      {product.price} {product.currency}
+                      {formatPrice(product.price)}{" "}
+                      {product.currency}
                     </div>
                   </div>
                 </div>
@@ -650,7 +734,7 @@ const ProductDetailPage: React.FC = () => {
                     className={
                       "px-3 py-1.5 rounded-full border text-[11px] " +
                       (selectedCategory === "uncategorized"
-                        ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100"
+                        ? "bg-slate-900 dark:bg-slate-100 text-white.dark:text-slate-900 border-slate-900 dark:border-slate-100"
                         : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800")
                     }
                   >
@@ -678,7 +762,7 @@ const ProductDetailPage: React.FC = () => {
                 return (
                   <article
                     key={sp.id}
-                    className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col"
+                    className="bg-white dark:bg-slate-900 rounded-2xl.shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden.flex flex-col"
                   >
                     {image ? (
                       <img
@@ -687,20 +771,25 @@ const ProductDetailPage: React.FC = () => {
                         className="w-full h-40 md:h-48 object-cover"
                       />
                     ) : (
-                      <div className="w-full h-40 md:h-48 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 text-[11px]">
+                      <div className="w-full h-40 md:h-48 bg-slate-100 dark:bg-slate-800 flex.items-center justify-center text-slate-400 dark:text-slate-500 text-[11px]">
                         {texts.suggestionNoImage}
                       </div>
                     )}
-                    <div className="p-3 flex flex-col gap-1 flex-1">
+                    <div className="p-3 flex flex-col gap-1.flex-1">
                       <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 line-clamp-2">
                         {sp.name}
                       </h4>
+                      {sp.category && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-300 w-fit">
+                          {sp.category.name}
+                        </span>
+                      )}
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2">
                         {sp.description}
                       </p>
                       <div className="mt-auto flex items-center justify-between text-[11px]">
                         <span className="font-semibold text-orange-600 dark:text-orange-400">
-                          {sp.price} {sp.currency}
+                          {formatPrice(sp.price)} {sp.currency}
                         </span>
                         <Link
                           to={`/products/${sp.id}`}

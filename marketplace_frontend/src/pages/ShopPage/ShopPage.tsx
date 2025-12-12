@@ -1,11 +1,12 @@
-// src/pages/ShopPage.tsx
-import React, { useEffect, useState } from "react";
+// src/pages/ShopPage/ShopPage.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import apiClient from "../lib/apiClient";
-import MainHeader from "../components/MainHeader";
-import MainFooter from "../components/MainFooter";
-import GoogleMapPreview, { type LatLng } from "../components/GoogleMapPreview";
-import { useLanguage } from "../contexts/LanguageContext";
+import apiClient from "../../lib/apiClient";
+import MainHeader from "../../components/MainHeader";
+import MainFooter from "../../components/MainFooter";
+import GoogleMapPreview, { type LatLng } from "../../components/GoogleMapPreview";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getShopPageTexts } from "./ShopPageTexts";
 
 interface ShopLocation {
   id: number;
@@ -28,19 +29,22 @@ interface ShopDetail {
   total_sales: number;
   location?: ShopLocation | null;
 
-  // picha & logo kama ilivyo kwa SellersPage
   logo?: string | null;
   logo_url?: string | null;
   shop_image?: string | null;
   shop_image_url?: string | null;
 }
 
-// ====== PRODUCT IMAGE (GALLERY) ======
 interface ProductImage {
   id: number;
   image: string;
   image_url?: string | null;
   is_primary?: boolean;
+}
+
+interface CategoryMini {
+  id: number;
+  name: string;
 }
 
 interface ShopProduct {
@@ -54,12 +58,12 @@ interface ShopProduct {
   city?: string | null;
   is_active?: boolean;
 
-  // gallery kutoka backend
   images?: ProductImage[];
 
-  // likes info kutoka backend (optional)
   likes_count?: number;
   is_liked?: boolean;
+
+  category?: CategoryMini | null;
 }
 
 interface PaginatedProductList {
@@ -76,7 +80,9 @@ interface ProductLikeToggleResponse {
   likes_count: number;
 }
 
-// helpers za picha za duka
+type CategoryFilterValue = "all" | "uncategorized" | number;
+
+// ====== HELPERS ======
 const getShopCoverImage = (shop: ShopDetail | null): string | null => {
   if (!shop) return null;
   return shop.shop_image_url || shop.shop_image || null;
@@ -92,7 +98,6 @@ const getShopInitial = (shop: ShopDetail | null): string => {
   return shop.business_name?.charAt(0)?.toUpperCase() || "";
 };
 
-// ==== KUCHAGUA PICHA KUU KWA PRODUCT (kama ProductsPage) ====
 const getMainImage = (product: ShopProduct): string | null => {
   const primary =
     product.images?.find((img) => img.is_primary) ?? product.images?.[0];
@@ -105,36 +110,56 @@ const getMainImage = (product: ShopProduct): string | null => {
   );
 };
 
+const formatPrice = (raw: string | number | null | undefined): string => {
+  if (raw === null || raw === undefined) return "";
+  const str = String(raw);
+  if (!str) return "";
+
+  const isNegative = str.startsWith("-");
+  const numeric = isNegative ? str.slice(1) : str;
+
+  const [intPartRaw, fracPart] = numeric.split(".");
+  const intPart = intPartRaw.replace(/\D/g, "") || "0";
+
+  const intFormatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  const withSign = isNegative ? `-${intFormatted}` : intFormatted;
+  return fracPart ? `${withSign}.${fracPart}` : withSign;
+};
+
 const ShopPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const isSw = language === "sw";
+  const texts = getShopPageTexts(language);
 
   const [shop, setShop] = useState<ShopDetail | null>(null);
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // likes state
   const [likeBusyId, setLikeBusyId] = useState<number | null>(null);
   const [likeError, setLikeError] = useState<string | null>(null);
 
+  const [selectedCategory, setSelectedCategory] =
+    useState<CategoryFilterValue>("all");
+
   const loadShop = async () => {
     if (!id) {
-      setError(isSw ? "Duka halijapatikana." : "Shop not found.");
+      setError(texts.shopNotFound);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     setError(null);
+
     try {
-      // 1) Maelezo ya duka
+      // 1) Shop details
       const shopRes = await apiClient.get<ShopDetail>(`/api/sellers/${id}/`);
       setShop(shopRes.data);
 
-      // 2) Bidhaa za duka – tumia endpoint rasmi: /api/sellers/{id}/products/
+      // 2) Shop products
       let shopProducts: ShopProduct[] = [];
 
       try {
@@ -142,9 +167,7 @@ const ShopPage: React.FC = () => {
           PaginatedProductList | ShopProduct[]
         >(`/api/sellers/${id}/products/`);
 
-        const raw = productsRes.data as unknown as
-          | PaginatedProductList
-          | ShopProduct[];
+        const raw = productsRes.data as PaginatedProductList | ShopProduct[];
 
         if (Array.isArray(raw)) {
           shopProducts = raw;
@@ -152,7 +175,7 @@ const ShopPage: React.FC = () => {
           shopProducts = raw.results;
         }
       } catch (innerErr) {
-        // fallback → kama backend bado unatumia /api/products/?seller_id=...
+        // fallback: /api/products/?seller_id=...
         console.error("Fallback to /api/products/ with seller_id", innerErr);
         const params = new URLSearchParams();
         params.set("seller_id", id);
@@ -168,11 +191,7 @@ const ShopPage: React.FC = () => {
       setProducts(shopProducts);
     } catch (err) {
       console.error(err);
-      setError(
-        isSw
-          ? "Imeshindikana kupakia taarifa za duka."
-          : "Failed to load shop information.",
-      );
+      setError(texts.failedToLoadShop);
     } finally {
       setLoading(false);
     }
@@ -181,6 +200,11 @@ const ShopPage: React.FC = () => {
   useEffect(() => {
     void loadShop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // reset category each time unapoingia duka jipya
+  useEffect(() => {
+    setSelectedCategory("all");
   }, [id]);
 
   const mapCenter: LatLng | null = (() => {
@@ -198,7 +222,7 @@ const ShopPage: React.FC = () => {
       ? `https://www.google.com/maps/dir/?api=1&destination=${shop.location.latitude},${shop.location.longitude}`
       : undefined;
 
-  const shopName = shop?.business_name || (isSw ? "Duka" : "Shop");
+  const shopName = shop?.business_name || "Shop";
 
   const ratingDisplay = (() => {
     if (!shop) return null;
@@ -211,7 +235,36 @@ const ShopPage: React.FC = () => {
   const logoImage = getShopLogoImage(shop);
   const initial = getShopInitial(shop);
 
-  // ==== LIKE TOGGLE HANDLER ====
+  const categoriesFromShop: CategoryMini[] = useMemo(() => {
+    const map = new Map<number, CategoryMini>();
+    for (const p of products) {
+      if (p.category) {
+        map.set(p.category.id, {
+          id: p.category.id,
+          name: p.category.name,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [products]);
+
+  const hasUncategorized = useMemo(
+    () => products.some((p) => !p.category),
+    [products],
+  );
+
+  const visibleProducts = useMemo(() => {
+    if (selectedCategory === "all") return products;
+    if (selectedCategory === "uncategorized") {
+      return products.filter((p) => !p.category);
+    }
+    return products.filter(
+      (p) => p.category && p.category.id === selectedCategory,
+    );
+  }, [selectedCategory, products]);
+
   const handleToggleLike = async (productId: number) => {
     if (!productId) return;
     setLikeError(null);
@@ -240,23 +293,17 @@ const ShopPage: React.FC = () => {
       );
     } catch (err) {
       console.error(err);
-      setLikeError(
-        isSw
-          ? "Imeshindikana kubadilisha like. Hakikisha umeingia (login) kisha jaribu tena."
-          : "Failed to update like. Make sure you are logged in and try again.",
-      );
+      setLikeError(texts.likeError);
     } finally {
       setLikeBusyId(null);
     }
   };
 
-  // ==== CHAT HANDLER (chat seller kuhusu product) ====
   const handleOpenChat = (productId: number) => {
     if (!id) return;
     navigate(`/chat?product=${productId}&seller=${id}`);
   };
 
-  // idadi ya bidhaa
   const totalProducts = products.length;
   const activeProducts = products.filter((p) => p.is_active !== false).length;
 
@@ -264,7 +311,6 @@ const ShopPage: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
       <MainHeader />
 
-      {/* imepanuliwa hadi max-w-7xl ili desktop ionekane kubwa zaidi */}
       <main className="flex-1 max-w-7xl mx-auto px-4 py-5 md:py-7">
         {/* Breadcrumb + Back */}
         <div className="mb-4 flex items-center justify-between gap-2">
@@ -273,7 +319,7 @@ const ShopPage: React.FC = () => {
               to="/products"
               className="hover:text-orange-600 dark:hover:text-orange-400 hover:underline"
             >
-              {isSw ? "Bidhaa" : "Products"}
+              {texts.breadcrumbProducts}
             </Link>
             <span>/</span>
             <span className="text-slate-700 dark:text-slate-200 line-clamp-1">
@@ -281,20 +327,21 @@ const ShopPage: React.FC = () => {
             </span>
           </div>
           <button
+            type="button"
             onClick={() => navigate(-1)}
             className="text-[11px] md:text-xs text-slate-600 dark:text-slate-300 hover:underline"
           >
-            ← {isSw ? "Rudi nyuma" : "Back"}
+            ← {texts.backLabel}
           </button>
         </div>
 
         {loading ? (
           <div className="text-sm text-slate-600 dark:text-slate-300">
-            {isSw ? "Inapakia taarifa za duka..." : "Loading shop details..."}
+            {texts.loadingShopDetails}
           </div>
         ) : error || !shop ? (
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-red-100 dark:border-red-700 p-4 text-sm text-red-600 dark:text-red-300">
-            {error || (isSw ? "Duka halijapatikana." : "Shop not found.")}
+            {error || texts.shopNotFound}
           </div>
         ) : (
           <>
@@ -311,19 +358,14 @@ const ShopPage: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-linear-to-r from-slate-800 via-slate-700 to-slate-900 flex items-center justify-center text-xs md:text-sm text-slate-200">
-                      {/* {isSw
-                        ? "Hakuna picha ya duka — unaweza kuongeza kutoka kwenye wasifu wa muuzaji."
-                        : "No shop photo yet — you can upload one from your seller profile."} */}
-                    </div>
+                    <div className="w-full h-full bg-linear-to-r from-slate-800 via-slate-700 to-slate-900 flex items-center justify-center text-xs md:text-sm text-slate-200" />
                   )}
 
                   {/* gradient overlay */}
                   <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
 
-                  {/* Logo + title over cover */}
+                  {/* Logo + title */}
                   <div className="absolute left-4 bottom-3 md:left-6 md:bottom-5 flex items-end gap-3">
-                    {/* Logo / Initial */}
                     <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-white/90 dark:border-slate-900 flex items-center justify-center overflow-hidden text-sm md:text-base font-semibold text-slate-900 dark:text-slate-100">
                       {logoImage ? (
                         <img
@@ -336,7 +378,6 @@ const ShopPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Name + short badges */}
                     <div className="text-white space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h1 className="text-base md:text-lg lg:text-xl font-semibold leading-tight">
@@ -345,7 +386,7 @@ const ShopPage: React.FC = () => {
                         {shop.is_verified && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/90 text-[10px] font-medium">
                             <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                            {isSw ? "Imethibitishwa" : "Verified"}
+                            {language === "sw" ? "Imethibitishwa" : "Verified"}
                           </span>
                         )}
                       </div>
@@ -362,25 +403,23 @@ const ShopPage: React.FC = () => {
                         )}
                         {ratingDisplay && (
                           <span className="px-2 py-0.5 rounded-full bg-black/40 text-[10px]">
-                            {isSw ? "Rating" : "Rating"}: {ratingDisplay} ★
+                            {texts.statsRatingLabel}: {ratingDisplay} ★
                           </span>
                         )}
                         {shop.total_sales > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-black/40 text-[10px]">
-                            {isSw ? "Mauzo" : "Total sales"}:{" "}
-                            {shop.total_sales}+
+                            {texts.statsSalesLabel}:{" "}
+                            {formatPrice(shop.total_sales)}+
                           </span>
                         )}
                         {totalProducts > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-black/40 text-[10px]">
-                            {isSw ? "Bidhaa" : "Products"}: {totalProducts}{" "}
-                            {isSw ? "jumla" : "total"}
+                            {texts.statsProductsLabel}: {totalProducts}
                           </span>
                         )}
                         {activeProducts > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-black/40 text-[10px]">
-                            {isSw ? "Bidhaa hewani" : "Active products"}:{" "}
-                            {activeProducts}
+                            {texts.statsProductsActiveLabel}: {activeProducts}
                           </span>
                         )}
                       </div>
@@ -388,17 +427,13 @@ const ShopPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Body: description + actions */}
+                {/* Description + actions */}
                 <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="text-[11px] md:text-sm lg:text-base text-slate-600 dark:text-slate-300 max-w-2xl">
                     {shop.description ? (
                       <p className="line-clamp-3">{shop.description}</p>
                     ) : (
-                      <p className="italic">
-                        {isSw
-                          ? "Hakuna maelezo marefu ya duka yaliyojazwa bado."
-                          : "No long description has been added for this shop yet."}
-                      </p>
+                      <p className="italic">{texts.heroNoDescription}</p>
                     )}
                   </div>
 
@@ -408,7 +443,7 @@ const ShopPage: React.FC = () => {
                         href={`tel:${shop.phone_number}`}
                         className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-full bg-slate-900 dark:bg-slate-50 text-white dark:text-slate-900 text-[11px] md:text-xs font-semibold hover:bg-black dark:hover:bg-white"
                       >
-                        {isSw ? "Piga simu dukani" : "Call shop"}
+                        {texts.heroCallShop}
                       </a>
                     )}
                     {mapsUrl && (
@@ -418,28 +453,22 @@ const ShopPage: React.FC = () => {
                         rel="noreferrer"
                         className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-[11px] md:text-xs text-slate-700 dark:text-slate-100 hover:border-orange-500 hover:text-orange-600"
                       >
-                        {isSw
-                          ? "Fungua kwenye Google Maps"
-                          : "Open in Google Maps"}
+                        {texts.heroOpenInGoogleMaps}
                       </a>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Map card separate lakini karibu na hero */}
+              {/* Map card */}
               <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                   <div>
                     <h2 className="text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {isSw
-                        ? "Ramani ya mahali ilipo biashara"
-                        : "Map of shop location"}
+                      {texts.mapTitle}
                     </h2>
                     <p className="text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400">
-                      {isSw
-                        ? "Mahali pa duka kulingana na location iliyohifadhiwa kwenye wasifu wa muuzaji."
-                        : "Shop location based on the address saved in the seller profile."}
+                      {texts.mapSubtitle}
                     </p>
                   </div>
                   {shop.location?.address && (
@@ -452,9 +481,7 @@ const ShopPage: React.FC = () => {
                   <GoogleMapPreview center={mapCenter} height="260px" />
                 ) : (
                   <div className="h-56 flex items-center justify-center text-[11px] md:text-sm text-slate-500 dark:text-slate-400 px-4 text-center">
-                    {isSw
-                      ? "Hakuna taarifa kamili za latitude/longitude kwa duka hili. Tafadhali jaza location kutoka kwenye ukurasa wa muuzaji."
-                      : "No latitude/longitude information is available for this shop yet. Please complete the location from the seller profile page."}
+                    {texts.mapNoLocation}
                   </div>
                 )}
               </div>
@@ -465,23 +492,76 @@ const ShopPage: React.FC = () => {
               <div className="flex items-center justify-between mb-3 md:mb-4 gap-2">
                 <div>
                   <h2 className="text-sm md:text-base lg:text-lg font-semibold text-slate-900 dark:text-slate-50">
-                    {isSw
-                      ? `Bidhaa kutoka ${shopName}`
-                      : `Products from ${shopName}`}
+                    {texts.productsSectionTitle(shopName)}
                   </h2>
                   <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400">
-                    {isSw
-                      ? "Hapa unaona bidhaa zote za duka hili. Unaweza kufungua maelezo na kuwasiliana na muuzaji moja kwa moja."
-                      : "Browse all items sold by this shop. Open product details and chat directly with the seller."}
+                    {texts.productsSectionSubtitle}
                   </p>
                 </div>
                 <Link
                   to="/products"
                   className="text-[11px] md:text-xs text-orange-600 dark:text-orange-400 hover:underline"
                 >
-                  {isSw ? "Rudi kwenye bidhaa zote" : "Back to all products"}
+                  {texts.productsBackToAll}
                 </Link>
               </div>
+
+              {/* Category filters */}
+              {(categoriesFromShop.length > 0 || hasUncategorized) && (
+                <div className="mb-3">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {texts.filtersTitle}
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-1">
+                    {texts.filtersSubtitle}
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory("all")}
+                      className={
+                        "px-3 py-1.5 rounded-full border text-[11px] " +
+                        (selectedCategory === "all"
+                          ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100"
+                          : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800")
+                      }
+                    >
+                      {texts.filtersAllLabel}
+                    </button>
+
+                    {categoriesFromShop.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className={
+                          "px-3 py-1.5 rounded-full border text-[11px] " +
+                          (selectedCategory === cat.id
+                            ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100"
+                            : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800")
+                        }
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+
+                    {hasUncategorized && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory("uncategorized")}
+                        className={
+                          "px-3 py-1.5 rounded-full border text-[11px] " +
+                          (selectedCategory === "uncategorized"
+                            ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100"
+                            : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800")
+                        }
+                      >
+                        {texts.filtersUncategorizedLabel}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {likeError && (
                 <div className="mb-3 text-[11px] text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 px-3 py-2 rounded-xl">
@@ -491,13 +571,15 @@ const ShopPage: React.FC = () => {
 
               {products.length === 0 ? (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-4 md:p-5 text-[11px] md:text-sm text-slate-500 dark:text-slate-300">
-                  {isSw
-                    ? "Duka hili bado halijaweka bidhaa. Jaribu kutembelea tena baadae au wasiliana na muuzaji moja kwa moja."
-                    : "This shop has not listed any products yet. Check back later or contact the seller directly."}
+                  {texts.productsEmptyForShop}
+                </div>
+              ) : visibleProducts.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-4 md:p-5 text-[11px] md:text-sm text-slate-500 dark:text-slate-300">
+                  {texts.productsEmptyForCategory}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 lg:gap-6">
-                  {products.map((p) => {
+                  {visibleProducts.map((p) => {
                     const img = getMainImage(p);
                     const likesCount = p.likes_count ?? 0;
                     const isLiked = Boolean(p.is_liked);
@@ -507,10 +589,10 @@ const ShopPage: React.FC = () => {
                         key={p.id}
                         className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow flex flex-col overflow-hidden relative"
                       >
-                        {/* LIKE BADGE / BUTTON */}
+                        {/* like button */}
                         <button
                           type="button"
-                          onClick={() => handleToggleLike(p.id)}
+                          onClick={() => void handleToggleLike(p.id)}
                           disabled={likeBusyId === p.id}
                           className="absolute right-2 top-2 z-10 px-2 py-1 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 text-[11px] flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
                         >
@@ -536,7 +618,7 @@ const ShopPage: React.FC = () => {
                           />
                         ) : (
                           <div className="w-full h-44 md:h-52 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
-                            {isSw ? "Hakuna picha" : "No image"}
+                            {texts.productNoImage}
                           </div>
                         )}
 
@@ -548,28 +630,34 @@ const ShopPage: React.FC = () => {
                             {p.description}
                           </p>
 
+                          {p.category && (
+                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-300 w-fit">
+                              {p.category.name}
+                            </span>
+                          )}
+
                           <div className="mt-1 flex items-center justify-between text-[11px] md:text-xs">
                             <span className="font-semibold text-orange-600 dark:text-orange-400">
-                              {p.price} {p.currency}
+                              {formatPrice(p.price)} {p.currency}
                             </span>
                             {p.is_active === false ? (
                               <span className="text-[10px] text-red-500 dark:text-red-400 font-semibold">
-                                {isSw ? "Haionekani kwa wateja" : "Hidden"}
+                                {texts.productHiddenLabel}
                               </span>
                             ) : (
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                                {isSw ? "Inapatikana" : "Available"}
+                                {texts.productAvailableLabel}
                               </span>
                             )}
                           </div>
 
-                          {/* CTA strip bottom-aligned */}
+                          {/* CTA strip */}
                           <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px] md:text-xs">
                             <Link
                               to={`/products/${p.id}`}
                               className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-full bg-slate-900 dark:bg-slate-50 text-white dark:text-slate-900 font-medium hover:bg-black dark:hover:bg-white"
                             >
-                              {isSw ? "Tazama maelezo" : "View details"}
+                              {texts.productViewDetails}
                             </Link>
 
                             <button
@@ -577,7 +665,7 @@ const ShopPage: React.FC = () => {
                               onClick={() => handleOpenChat(p.id)}
                               className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 hover:border-orange-500 hover:text-orange-600 dark:hover:text-orange-400"
                             >
-                              {isSw ? "Ongea na muuzaji" : "Chat seller"}
+                              {texts.productChatSeller}
                             </button>
                           </div>
                         </div>

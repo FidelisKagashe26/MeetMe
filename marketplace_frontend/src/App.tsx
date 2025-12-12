@@ -9,12 +9,12 @@ import SellerProfilePage from "./pages/SellerProfilePage/SellerProfilePage";
 import NearbyProductsPage from "./pages/NearbyProductsPage/NearbyProductsPage";
 import ProductCreatePage from "./pages/ProductCreatePage/ProductCreatePage";
 import ProductDetailPage from "./pages/ProductDetailPage/ProductDetailPage";
-import ProductEditPage from "./pages/ProductEditPage";
+import ProductEditPage from "./pages/ProductEditPage/ProductEditPage";
 import OrderCreatePage from "./pages/OrderCreatePage";
-import ShopPage from "./pages/ShopPage";
+import ShopPage from "./pages/ShopPage/ShopPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-import AccountProfilePage from "./pages/AccountProfilePage";
+import AccountProfilePage from "./pages/AccountProfilePage/AccountProfilePage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import SellersPage from "./pages/SellersPage/SellersPage";
